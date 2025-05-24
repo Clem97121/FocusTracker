@@ -1,0 +1,36 @@
+<Window x:Class="FocusTracker.App.Views.CustomMessageBox"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Foreground="White"
+        ResizeMode="NoResize"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="CenterScreen"
+        Topmost="True"
+        MouseDown="Window_MouseDown">
+
+	<Border Background="{StaticResource SecondAccentBrush}"
+            CornerRadius="12"
+            Padding="24"
+            BorderBrush="{StaticResource DangerBrush}"
+            BorderThickness="2">
+		<StackPanel>
+			<TextBlock x:Name="MessageText"
+                       Text="..."
+                       TextWrapping="Wrap"
+                       FontSize="16"
+                       Margin="0 0 0 20"
+                       Foreground="{StaticResource TextBrush}"/>
+
+			<Button Content="OK"
+                    Width="100"
+                    Height="32"
+                    HorizontalAlignment="Right"
+                    Style="{StaticResource PrimaryButton}"
+					Background="{StaticResource PrimaryBrush}"
+                    Click="Ok_Click"/>
+		</StackPanel>
+	</Border>
+</Window>

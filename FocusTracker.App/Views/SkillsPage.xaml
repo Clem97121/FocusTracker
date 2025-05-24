@@ -1,0 +1,162 @@
+﻿<UserControl x:Class="FocusTracker.App.Views.SkillsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:FocusTracker.App.Converters"
+             Background="Transparent">
+
+    <UserControl.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <converters:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20">
+            <TextBlock Text="Категорії навичок"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       Margin="0 0 0 20"/>
+
+            <ItemsControl ItemsSource="{Binding Categories}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Expander 
+                                  Background="{StaticResource SecondAccentBrush}"
+                                  Foreground="{StaticResource TextBrush}"
+                                  Padding="8"
+                                  MinWidth="400"
+                                  HorizontalAlignment="Left"
+                                  IsExpanded="{Binding IsExpanded, Mode=TwoWay}"
+                                  Margin="0 0 0 10">
+                            <Expander.Header>
+                                <Border DataContext="{Binding}">
+                                    <Border.ContextMenu>
+                                        <ContextMenu Style="{StaticResource DarkContextMenu}">
+                                            <MenuItem Header="Додати навичку" Click="AddSkill_Click" CommandParameter="{Binding}"/>
+                                            <MenuItem Header="Редагувати" Click="EditCategory_Click" CommandParameter="{Binding}"/>
+                                            <MenuItem Header="Видалити" Click="DeleteCategory_Click" CommandParameter="{Binding}"/>
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+                                    <StackPanel HorizontalAlignment="Left">
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontWeight="Bold"
+                                                   VerticalAlignment="Center"
+                                                   Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                                        <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource TextBoxStyle}"
+                                                 Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                 LostFocus="NameBox_LostFocus"
+                                                 KeyDown="NameBox_KeyDown"
+                                                 Loaded="NameBox_Loaded"/>
+                                    </StackPanel>
+                                </Border>
+                            </Expander.Header>
+
+                            <StackPanel>
+                                <ItemsControl ItemsSource="{Binding Skills}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{StaticResource PrimaryBrush}"
+                                                    CornerRadius="10"
+                                                    Padding="8"
+                                                    Margin="6 4 6 4">
+                                                <StackPanel>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Name}"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="White"
+                                                                   FontSize="14"
+                                                                   Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                                                            <TextBlock.ContextMenu>
+                                                                <ContextMenu Style="{StaticResource DarkContextMenu}">
+                                                                    <MenuItem Header="Редагувати" Click="EditSkill_Click"/>
+                                                                    <MenuItem Header="Видалити" Click="DeleteSkill_Click"/>
+                                                                </ContextMenu>
+                                                            </TextBlock.ContextMenu>
+                                                        </TextBlock>
+                                                        <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                                                 Style="{StaticResource TextBoxStyle}"
+                                                                 Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                                 LostFocus="SkillEditBox_LostFocus"
+                                                                 KeyDown="SkillEditBox_KeyDown"
+                                                                 Loaded="SkillEditBox_Loaded"/>
+                                                        <TextBlock Text=" • " Foreground="White" Margin="6 0"/>
+                                                        <TextBlock Text="Рівень:" Foreground="White"/>
+                                                        <TextBlock Text="{Binding Level}" Foreground="White" FontWeight="Bold" Margin="4 0"/>
+                                                    </StackPanel>
+
+                                                    <ProgressBar Minimum="0"
+                                                                 Maximum="{Binding XpToNextLevel}"
+                                                                 Value="{Binding Xp}"
+                                                                 Height="6"
+                                                                 Foreground="{StaticResource TextBrush}"
+                                                                 Background="#333"
+                                                                 Margin="0 4 0 0"
+                                                                 ToolTip="{Binding XpProgressPercent, StringFormat={}{0:F1}%}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Форма додавання навички -->
+                                <StackPanel Orientation="Horizontal"
+                                            Margin="0,4,0,0"
+                                            Visibility="{Binding IsAddingSkill, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBox Text="{Binding NewSkillName, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource TextBoxStyle}"
+                                             Width="160"
+                                             LostFocus="SkillBox_LostFocus"
+                                             KeyDown="SkillBox_KeyDown"
+                                             Loaded="SkillBox_Loaded"/>
+                                    <Button Content="✖"
+                                            Width="30"
+                                            Height="30"
+                                            Margin="10,0,0,0"
+                                            Background="{StaticResource SecondAccentBrush}"
+                                            Foreground="White"
+                                            BorderBrush="Transparent"
+                                            FontWeight="Bold"
+                                            Click="CancelSkill_Click"
+                                            PreviewMouseDown="CancelSkill_PreviewMouseDown"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Expander>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Кнопка додавання категорії -->
+            <Button Content="Додати категорію"
+                    Style="{StaticResource PrimaryButton}"
+                    Click="AddCategory_Click"
+                    HorizontalAlignment="Left"
+                    Margin="0,10,0,0"
+                    Width="160"
+                    Visibility="{Binding IsAddingCategory, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+
+            <!-- Форма створення категорії -->
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,10,0,0"
+                        Visibility="{Binding IsAddingCategory, Converter={StaticResource BoolToVisibilityConverter}}">
+
+                <TextBox Style="{StaticResource TextBoxStyle}"
+                         Text="{Binding NewCategoryName, UpdateSourceTrigger=PropertyChanged}"
+                         Width="200"
+                         LostFocus="NewCategoryBox_LostFocus"
+                         KeyDown="NewCategoryBox_KeyDown"
+                         Loaded="NewCategoryBox_Loaded"/>
+                <Button Content="✖"
+                        Width="30"
+                        Height="30"
+                        Margin="10,0,0,0"
+                        Background="{StaticResource SecondAccentBrush}"
+                        Foreground="White"
+                        BorderBrush="Transparent"
+                        FontWeight="Bold"
+                        Click="CancelNewCategory_Click"
+                        PreviewMouseDown="CancelNewCategory_PreviewMouseDown"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

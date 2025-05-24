@@ -1,0 +1,18 @@
+# Сборки .NET
+bin/
+obj/
+publish/
+
+# Установщики и билды
+*.exe
+*.dll
+*.msi
+*.zip
+*.pdb
+*.db
+
+Installer/Output/
+
+# Visual Studio
+.vs/
+.vscode/

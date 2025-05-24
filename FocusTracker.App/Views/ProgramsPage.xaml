@@ -1,0 +1,197 @@
+﻿<UserControl x:Class="FocusTracker.App.Views.ProgramsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:FocusTracker.App.Converters"
+             xmlns:controls="clr-namespace:FocusTracker.App.Controls"
+             Background="Transparent"
+             Loaded="UserControl_Loaded">
+
+    <UserControl.Resources>
+        <converters:ByteArrayToImageConverter x:Key="ByteArrayToImageConverter"/>
+        <converters:CategoryToColorConverter x:Key="CategoryToColorConverter"/>
+        <converters:CardWidthConverter x:Key="CardWidthConverter"/>
+        <converters:CategoryToGradientConverter x:Key="CategoryToGradientConverter"/>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20">
+
+            <!-- Заголовок + сортировка -->
+            <DockPanel Margin="0 0 25 10">
+                <TextBlock Text="Видимі програми"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Foreground="White"
+                           VerticalAlignment="Center"
+                           DockPanel.Dock="Left"/>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
+                    <TextBlock Text="Сортувати за:"
+                               Foreground="White"
+                               Margin="20 0 10 0"
+                               VerticalAlignment="Center"/>
+                    <ComboBox Width="150"
+                              SelectedValue="{Binding SortOption, Mode=TwoWay}"
+                              SelectedValuePath="Content"
+                              Style="{StaticResource CustomComboBox}">
+                        <ComboBoxItem Content="Name"/>
+                        <ComboBoxItem Content="Category"/>
+                        <ComboBoxItem Content="Tracked"/>
+                    </ComboBox>
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Видимі програми -->
+            <ItemsControl ItemsSource="{Binding VisiblePrograms}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <controls:CustomWrapPanel x:Name="VisibleWrap" Orientation="Horizontal" IsItemsHost="True"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="10"
+                                Padding="10"
+                                CornerRadius="10"
+                                Width="{Binding ElementName=VisibleWrap, Path=ActualWidth, Converter={StaticResource CardWidthConverter}}">
+                            <Border.Background>
+                                <MultiBinding Converter="{StaticResource CategoryToGradientConverter}">
+                                    <Binding Path="Category"/>
+                                    <Binding Path="IsHidden"/>
+                                </MultiBinding>
+                            </Border.Background>
+
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0 0 0 4">
+                                    <Image Width="25" Height="25" Margin="0 0 6 0"
+                                           Source="{Binding IconBytes, Converter={StaticResource ByteArrayToImageConverter}}"/>
+                                    <TextBlock Text="{Binding DisplayName}"
+                                               FontSize="16"
+                                               FontWeight="SemiBold"
+                                               Foreground="White"
+                                               TextTrimming="CharacterEllipsis"
+                                               TextWrapping="NoWrap"
+                                               Width="Auto"
+                                               VerticalAlignment="Center"
+                                               ToolTip="{Binding DisplayName}"/>
+                                </StackPanel>
+
+                                <TextBlock Text="{Binding Name}" Foreground="Gray" FontSize="13" Margin="30,0,0,6"/>
+
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                    <CheckBox Content="&#xE960;" ToolTip="Відстежувати"
+                                              IsChecked="{Binding IsTracked, Mode=TwoWay}"
+                                              Style="{StaticResource IconCheckBoxStyle}" Margin="0 0 8 0"/>
+                                    <CheckBox Content="&#xE890;" ToolTip="Сховати"
+                                              IsChecked="{Binding IsHidden, Mode=TwoWay}"
+                                              Style="{StaticResource IconCheckBoxStyle}" Margin="0 0 8 0"/>
+                                    <ComboBox SelectedValue="{Binding Category, Mode=TwoWay}"
+          SelectedValuePath="Content"
+          Width="100"
+          BorderThickness="2"
+          Style="{StaticResource CustomComboBox}">
+
+                                        <ComboBox.BorderBrush>
+                                            <MultiBinding Converter="{StaticResource CategoryToColorConverter}">
+                                                <Binding Path="Category"/>
+                                                <Binding Path="IsHidden"/>
+                                            </MultiBinding>
+                                        </ComboBox.BorderBrush>
+
+                                        <ComboBoxItem Content="Продуктивні"/>
+                                        <ComboBoxItem Content="Непродуктивні"/>
+                                        <ComboBoxItem Content="Суміжні"/>
+                                    </ComboBox>
+
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Кнопка "Показати/Сховати" -->
+            <StackPanel Margin="0 30 0 10">
+                <Button Content="{Binding ShowHidden, Converter={StaticResource BoolToTextConverter}}"
+                        Width="250"
+                        Height="30"
+                        HorizontalAlignment="Left"
+                        Click="ToggleHiddenPrograms_Click"
+                        Style="{StaticResource AccentButtonStyle}" />
+            </StackPanel>
+
+            <!-- Анимация через ScaleTransform -->
+            <Grid x:Name="HiddenProgramsContainer"
+                  RenderTransformOrigin="0,0">
+                <Grid.RenderTransform>
+                    <ScaleTransform x:Name="HiddenProgramsScale" ScaleY="0"/>
+                </Grid.RenderTransform>
+
+                <ItemsControl ItemsSource="{Binding HiddenPrograms}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <controls:CustomWrapPanel x:Name="HiddenWrap" Orientation="Horizontal" IsItemsHost="True"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="10"
+                                    Padding="10"
+                                    CornerRadius="10"
+                                    Width="{Binding ElementName=HiddenWrap, Path=ActualWidth, Converter={StaticResource CardWidthConverter}}">
+                                <Border.Background>
+                                    <MultiBinding Converter="{StaticResource CategoryToGradientConverter}">
+                                        <Binding Path="Category"/>
+                                        <Binding Path="IsHidden"/>
+                                    </MultiBinding>
+                                </Border.Background>
+
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0 0 0 4">
+                                        <Image Width="25" Height="25" Margin="0 0 6 0"
+                                               Source="{Binding IconBytes, Converter={StaticResource ByteArrayToImageConverter}}"/>
+                                        <TextBlock Text="{Binding DisplayName}"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="White"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   TextWrapping="NoWrap"
+                                                   Width="220"
+                                                   VerticalAlignment="Center"
+                                                   ToolTip="{Binding DisplayName}"/>
+                                    </StackPanel>
+
+                                    <TextBlock Text="{Binding Name}" Foreground="Gray" FontSize="13" Margin="30,0,0,6"/>
+
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                        <CheckBox Content="&#xE890;" ToolTip="Сховати"
+                                                  IsChecked="{Binding IsHidden, Mode=TwoWay}"
+                                                  Style="{StaticResource IconCheckBoxStyle}" Margin="0 0 8 0"/>
+                                        <ComboBox SelectedValue="{Binding Category, Mode=TwoWay}"
+          SelectedValuePath="Content"
+          Width="100"
+          BorderThickness="2"
+          Style="{StaticResource CustomComboBox}">
+
+                                            <ComboBox.BorderBrush>
+                                                <MultiBinding Converter="{StaticResource CategoryToColorConverter}">
+                                                    <Binding Path="Category"/>
+                                                    <Binding Path="IsHidden"/>
+                                                </MultiBinding>
+                                            </ComboBox.BorderBrush>
+
+                                            <ComboBoxItem Content="Продуктивні"/>
+                                            <ComboBoxItem Content="Непродуктивні"/>
+                                            <ComboBoxItem Content="Суміжні"/>
+                                        </ComboBox>
+
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

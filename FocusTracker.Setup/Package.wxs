@@ -1,0 +1,87 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+	<!-- 
+    Здесь нужно указать свой UpgradeCode (новый GUID),
+    а Id="*" значит Auto-generate ProductCode при каждом билде.
+  -->
+	<Product
+	  Id="*"
+	  Name="FocusTracker"
+	  Language="1033"
+	  Version="1.0.0.0"
+	  Manufacturer="YourCompany"
+	  UpgradeCode="PUT-A-NEW-GUID-HERE">
+
+		<!-- 
+      Основные параметры MSI-пакета 
+    -->
+		<Package
+		  InstallerVersion="500"
+		  Compressed="yes"
+		  InstallScope="perMachine" />
+
+		<!-- Иконка для Programs & Features -->
+		<Icon Id="AppIcon" SourceFile="..\FocusTracker.App\icon.ico" />
+		<Property Id="ARPPRODUCTICON" Value="AppIcon" />
+
+		<!-- Подключаем стандартный UI с выбором папки -->
+		<UIRef Id="WixUI_InstallDir" />
+		<Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
+		<!-- Дерево каталогов -->
+		<Directory Id="TARGETDIR" Name="SourceDir">
+			<Directory Id="ProgramFilesFolder">
+				<Directory Id="INSTALLFOLDER" Name="FocusTracker" />
+			</Directory>
+			<Directory Id="ProgramMenuFolder">
+				<Directory Id="ApplicationProgramsFolder" Name="FocusTracker" />
+			</Directory>
+		</Directory>
+
+		<!-- Наш EXE и ярлык в Пуске -->
+		<DirectoryRef Id="INSTALLFOLDER">
+			<Component Id="cmp_FocusTrackerExe" Guid="PUT-ANOTHER-GUID-HERE">
+				<!-- главный исполняемый файл -->
+				<File
+				  Id="fil_FocusTrackerExe"
+				  Source="..\FocusTracker.App\bin\Release\net6.0-windows\FocusTracker.App.exe"
+				  KeyPath="yes" />
+
+				<!-- ярлык в меню Пуск -->
+				<Shortcut
+				  Id="lnk_StartMenu"
+				  Directory="ApplicationProgramsFolder"
+				  Name="FocusTracker"
+				  WorkingDirectory="INSTALLFOLDER"
+				  Icon="AppIcon"
+				  IconIndex="0"
+				  Advertise="yes" />
+
+				<!-- фиктивная запись в реестр, чтобы MSI знал, что компонент установлен -->
+				<RegistryValue
+				  Root="HKLM"
+				  Key="Software\YourCompany\FocusTracker"
+				  Name="Installed"
+				  Type="integer"
+				  Value="1"
+				  KeyPath="no" />
+			</Component>
+		</DirectoryRef>
+
+		<!-- Описываем, какие компоненты входят в наш Feature -->
+		<Feature
+		  Id="MainFeature"
+		  Title="FocusTracker"
+		  Level="1">
+			<ComponentRef Id="cmp_FocusTrackerExe" />
+		</Feature>
+
+		<!-- Обновления: автоматически удаляем старые версии -->
+		<MajorUpgrade
+		  DowngradeErrorMessage="You cannot install an older version of FocusTracker over a newer one." />
+
+	</Product>
+</Wix>

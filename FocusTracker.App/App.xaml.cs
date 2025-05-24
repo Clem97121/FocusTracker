@@ -1,0 +1,218 @@
+﻿using System;
+using System.Diagnostics;
+using System.Linq;
+using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
+using FocusTracker.App.Views;
+using FocusTracker.Core.Services;
+using FocusTracker.Data;
+using FocusTracker.Data.Services;
+using FocusTracker.Domain.Interfaces;
+using FocusTracker.Domain.Models;
+using FocusTracker.App.Services;
+using System.IO;
+using Microsoft.Win32;
+
+namespace FocusTracker.App
+{
+    public partial class App : Application
+    {
+        public static Action<string>? ShowUiNotification;
+        public static IServiceProvider Services { get; private set; }
+
+        private ActiveWindowTracker _windowTracker;
+        private System.Windows.Forms.NotifyIcon _notifyIcon;
+        private bool _exitRequested;
+        public bool IsExitRequested => _exitRequested;
+
+        private Timer _notificationTimer;
+        private Timer _impulseTimer;
+
+        private readonly Dictionary<string, DateTime> _violationCache = new();
+        private readonly HashSet<string> _notifiedProcesses = new(); // в App.cs (глобально)
+
+        private void AddToStartup()
+        {
+            string appName = "FocusTracker";
+            string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+
+            using RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
+            if (key.GetValue(appName) == null)
+            {
+                key.SetValue(appName, $"\"{exePath}\"");
+            }
+        }
+
+        protected override async void OnStartup(StartupEventArgs e)
+        {
+            base.OnStartup(e);
+
+            AddToStartup();
+
+            ConfigureServices();
+
+            using (var scope = Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<FocusTrackerDbContext>();
+                db.Database.Migrate(); // автоматическое создание БД и таблиц
+            }
+
+            ShowUiNotification = message =>
+            {
+                var box = new Views.CustomMessageBox(message);
+                box.ShowDialog();
+            };
+
+            // ✅ Синхронизация программ (через Scope)
+            using (var scope = Services.CreateScope())
+            {
+                var syncService = Services.GetRequiredService<ProgramSyncService>();
+                await syncService.SyncAsync();
+            }
+
+            // ✅ Запуск уведомлений об ограничениях
+            _notificationTimer = new Timer(async _ =>
+            {
+                using var scope = Services.CreateScope();
+                var service = scope.ServiceProvider.GetRequiredService<IRestrictionNotificationService>();
+                await service.CheckAndNotifyAsync();
+            }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+
+            // ✅ Запуск імпульсних нагадувань
+            _impulseTimer = new Timer(async _ =>
+            {
+                using var scope = Services.CreateScope();
+                var service = scope.ServiceProvider.GetRequiredService<IImpulseReminderService>();
+                await service.CheckAndRemindAsync();
+            }, null,
+               TimeSpan.FromHours(1),    // перший виклик через годину
+               TimeSpan.FromHours(1));   // далі — щогодини
+
+
+            // ✅ Ініціалізація трекера активних вікон
+            var userActivity = new UserActivityTracker();
+            userActivity.Start();
+
+            var programServiceForTracker = Services.GetRequiredService<IProgramService>();
+            var nameResolver = Services.GetRequiredService<ProgramNameResolverService>();
+
+            _windowTracker = new ActiveWindowTracker(
+                async (appName, totalTime) =>
+                {
+                    using var scope = Services.CreateScope();
+                    var statService = scope.ServiceProvider.GetRequiredService<IAppUsageStatService>();
+                    var evaluator = scope.ServiceProvider.GetRequiredService<IRestrictionEvaluator>();
+                    var notifier = scope.ServiceProvider.GetRequiredService<INotificationService>();
+
+                    var activeTime = userActivity.GetAndResetActiveTime();
+                    await statService.AddOrUpdateUsageAsync(appName, totalTime, activeTime);
+
+                    var stats = await statService.GetStatsForTodayAsync();
+                    var todayStat = stats.FirstOrDefault(s => s.AppName == appName);
+                    var total = todayStat?.TotalTime ?? TimeSpan.Zero;
+
+                    if (!evaluator.TryGetViolatedRestrictions(appName, total, out var notes))
+                        return;
+
+                    var cacheKey = $"{appName}_{string.Join(",", notes)}";
+                    if (_violationCache.TryGetValue(cacheKey, out var lastShown) &&
+                        (DateTime.Now - lastShown).TotalSeconds < 5)
+                        return;
+
+                    _violationCache[cacheKey] = DateTime.Now;
+
+                    var message = $"Програму \"{appName}\" було закрито через перевищення обмеження:\n• {string.Join("\n• ", notes)}";
+                    notifier.ShowMessage(message, "Обмеження перевищено");
+
+                    var processes = Process.GetProcessesByName(appName);
+                    foreach (var proc in processes)
+                    {
+                        try { proc.Kill(); }
+                        catch { /* Опціонально можна логувати помилки */ }
+                    }
+                },
+                programServiceForTracker,
+                nameResolver
+            );
+
+
+            _windowTracker.Start();
+            SetupTrayIcon();
+
+            var mainWindow = new MainWindow();
+            mainWindow.Show();
+        }
+
+        private void ConfigureServices()
+        {
+            var services = new ServiceCollection();
+
+            var dbPath = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+    "FocusTracker",
+    "focus_tracker.db"
+);
+            Directory.CreateDirectory(Path.GetDirectoryName(dbPath));
+            services.AddDbContext<FocusTrackerDbContext>(options =>
+                options.UseSqlite($"Data Source={dbPath}"));
+
+            // ✅ Scoped-сервіси (використовують DbContext)
+            services.AddScoped<IAppUsageStatService, AppUsageStatService>();
+            services.AddScoped<IRestrictionEvaluator, RestrictionEvaluator>();
+            services.AddScoped<IProgramService, ProgramService>();
+            services.AddScoped<ISkillService, SkillService>();
+            services.AddScoped<ISkillCategoryService, SkillCategoryService>();
+            services.AddScoped<ITaskItemService, TaskItemService>();
+            services.AddScoped<ITaskProgramService, TaskProgramService>();
+            services.AddScoped<ITaskProgramUsageService, TaskProgramUsageService>();
+            services.AddScoped<ITrackedProgramService, TrackedProgramService>();
+            services.AddScoped<IRestrictionService, RestrictionService>();
+            services.AddScoped<IRestrictionNotificationService, RestrictionNotificationService>();
+            services.AddScoped<IImpulseReminderService, ImpulseReminderService>();
+
+            // ✅ Singleton (не залежить від DbContext)
+            services.AddSingleton<INotificationService, MessageBoxNotificationService>();
+            services.AddSingleton<ProgramNameResolverService>();
+            services.AddSingleton<ProgramSyncService>();
+
+
+            Services = services.BuildServiceProvider();
+        }
+
+        private void SetupTrayIcon()
+        {
+            _notifyIcon = new System.Windows.Forms.NotifyIcon
+            {
+                Icon = new System.Drawing.Icon("icon.ico"),
+                Visible = true,
+                Text = "FocusTracker",
+                ContextMenuStrip = new System.Windows.Forms.ContextMenuStrip()
+            };
+
+            _notifyIcon.ContextMenuStrip.Items.Add("Відкрити", null, (s, e) =>
+            {
+                Current.MainWindow.Show();
+                Current.MainWindow.WindowState = WindowState.Normal;
+            });
+
+            _notifyIcon.ContextMenuStrip.Items.Add("Вийти", null, (s, e) =>
+            {
+                _exitRequested = true;
+                Current.MainWindow.Close();
+            });
+
+            _notifyIcon.DoubleClick += (s, e) =>
+            {
+                Current.MainWindow.Show();
+                Current.MainWindow.WindowState = WindowState.Normal;
+            };
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            _notifyIcon?.Dispose();
+            base.OnExit(e);
+        }
+    }
+}

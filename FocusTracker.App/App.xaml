@@ -1,0 +1,38 @@
+﻿<Application x:Class="FocusTracker.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:FocusTracker.App.Converters"
+             xmlns:controls="clr-namespace:FocusTracker.App.Controls">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Colors.xaml"/>
+                <ResourceDictionary Source="Styles/Controls.xaml"/>
+                <ResourceDictionary Source="Styles/ChartStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <converters:ProgramSelectedConverter x:Key="ProgramSelectedConverter"/>
+            <converters:SliderValueToWidthConverter x:Key="SliderValueToWidthConverter"/>
+            <converters:SimpleSliderConverter x:Key="SimpleSliderConverter"/>
+            <converters:TimeIntervalVisibilityConverter x:Key="TimeIntervalVisibilityConverter"/>
+            <converters:InverseVisibilityConverter x:Key="InverseVisibilityConverter"/>
+            <converters:RestrictionDescriptionConverter x:Key="RestrictionDescriptionConverter"/>
+            <converters:ByteArrayToImageConverter x:Key="ByteArrayToImageConverter" />
+            <converters:CategoryToColorConverter  x:Key="CategoryToColorConverter" />
+            <converters:CardWidthConverter x:Key="CardWidthConverter"/>
+            <converters:TextOverflowConverter x:Key="TextOverflowConverter"/>
+            <converters:IsTextOverflowingConverter x:Key="IsTextOverflowingConverter"/>
+            <converters:CategoryToGradientConverter x:Key="CategoryToGradientConverter"/>
+            <converters:BoolToTextConverter x:Key="BoolToTextConverter"/>
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+            <converters:NearZeroToVisibilityConverter x:Key="NearZeroToVisibilityConverter"/>
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+            <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
+            <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
+            <converters:IsoStringToDateTimeConverter x:Key="IsoStringToDateTimeConverter"/>
+            <converters:BoolToHistoryToggleConverter x:Key="BoolToHistoryToggleConverter"/>
+            <converters:PercentToGridLengthConverter x:Key="PercentToGridLengthConverter"/>
+            <converters:DurationToReadableStringConverter x:Key="DurationToReadableStringConverter"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

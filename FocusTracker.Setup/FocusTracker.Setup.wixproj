@@ -1,0 +1,8 @@
+﻿<Project Sdk="WixToolset.Sdk/6.0.0">
+  <ItemGroup>
+    <ProjectReference Include="..\FocusTracker.App\FocusTracker.App.csproj" />
+    <ProjectReference Include="..\FocusTracker.Core\FocusTracker.Core.csproj" />
+    <ProjectReference Include="..\FocusTracker.Data\FocusTracker.Data.csproj" />
+    <ProjectReference Include="..\FocusTracker.Domain\FocusTracker.Domain.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,110 @@
+﻿<Window x:Class="FocusTracker.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FocusTracker"
+        Width="1000"
+        Height="600"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="CanResizeWithGrip">
+
+    <Border x:Name="MainBorder"
+            Background="{StaticResource AccentBrush}"
+            CornerRadius="1"
+            BorderBrush="{StaticResource SecondAccentBrush}"
+            BorderThickness="1"
+            SnapsToDevicePixels="True"
+            ClipToBounds="True">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="40"/>
+                <!-- Верхняя панель -->
+                <RowDefinition Height="*"/>
+                <!-- Контент -->
+            </Grid.RowDefinitions>
+
+            <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
+            <Grid Grid.Row="0"
+                  Background="{StaticResource AccentBrush}"
+                  MouseLeftButtonDown="Window_MouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Название экрана по центру -->
+                <TextBlock x:Name="PageTitleTextBlock"
+                           Text="Головна сторінка"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           FontSize="14"
+                           Foreground="White"
+                           FontWeight="Bold" />
+
+
+                <!-- Кнопки управления окном -->
+                <StackPanel Orientation="Horizontal" Grid.Column="1" VerticalAlignment="Center">
+                    <Button Width="40" Height="40" Margin="0,0,5,0"
+                            Content="–"
+                            Click="Minimize_Click"
+                            Background="{StaticResource AccentBrush}"
+                            Foreground="White"
+                            BorderBrush="Transparent"/>
+                    <Button Width="40" Height="40" Margin="0,0,5,0"
+                            Content="❐"
+                            Click="ToggleMaximize_Click"
+                            Background="{StaticResource AccentBrush}"
+                            Foreground="White"
+                            BorderBrush="Transparent"/>
+                    <Button Width="40" Height="40"
+                            Content="X"
+                            Click="Close_Click"
+                            Background="{StaticResource AccentBrush}"
+                            Foreground="White"
+                            BorderBrush="Transparent"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- ГЛАВНАЯ ЧАСТЬ С ЛЕВОЙ ПАНЕЛЬЮ -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="70"/>
+                    <!-- Левая панель -->
+                    <ColumnDefinition Width="*" />
+                    <!-- Контент -->
+                </Grid.ColumnDefinitions>
+
+                <!-- ЛЕВАЯ НАВИГАЦИОННАЯ ПАНЕЛЬ -->
+                <StackPanel Grid.Column="0"
+                            Background="{StaticResource AccentBrush}"
+                            Orientation="Vertical"
+                            VerticalAlignment="Stretch">
+                    <Button Content="📊" ToolTip="Статистика" Height="70" Margin="5"
+                            Background="Transparent" Foreground="White" BorderBrush="Transparent"
+                            Click="ShowStatsPage"/>
+                    <Button Content="🧠" ToolTip="Навички" Height="70" Margin="5"
+                            Background="Transparent" Foreground="White" BorderBrush="Transparent"
+                            Click="ShowSkillsPage"/>
+                    <Button Content="✅" ToolTip="Завдання" Height="70" Margin="5"
+                            Background="Transparent" Foreground="White" BorderBrush="Transparent"
+                            Click="ShowTasksPage"/>
+                    <Button Content="🔒" ToolTip="Обмеження" Height="70" Margin="5"
+                            Background="Transparent" Foreground="White" BorderBrush="Transparent"
+                            Click="ShowRestrictionsPage"/>
+                    <Button Content="!" ToolTip="Застосунки" Height="70" Margin="5"
+                            Background="Transparent" Foreground="White" BorderBrush="Transparent"
+                            Click="ShowProgramsPage"/>
+                </StackPanel>
+
+                <!-- ОСНОВНОЙ КОНТЕНТ -->
+                <Border Grid.Column="1"
+                        Background="{StaticResource PrimaryBrush}"
+                        CornerRadius="30, 0, 0, 0"
+                        Padding="30">
+                    <ContentControl x:Name="MainContent"/>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

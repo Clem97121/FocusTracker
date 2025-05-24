@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="icon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="icon.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FocusTracker.Core\FocusTracker.Core.csproj" />
+    <ProjectReference Include="..\FocusTracker.Data\FocusTracker.Data.csproj" />
+    <ProjectReference Include="..\FocusTracker.Domain\FocusTracker.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Resources\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LiveChartsCore.SkiaSharpView" Version="2.0.0-rc5.4" />
+    <PackageReference Include="System.Reactive.Windows.Forms" Version="6.0.1" />
+  </ItemGroup>
+
+</Project>
