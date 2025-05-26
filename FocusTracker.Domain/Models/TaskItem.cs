@@ -9,11 +9,8 @@ public class TaskItem
     public int SkillId { get; set; }
     public int EstimatedMinutes { get; set; }
     public int Difficulty { get; set; }
-
-    public string CreatedAt { get; set; }
-    public DateTime DateCreated { get; set; } // 🔹 используем для фильтрации по дате
+    public DateTime DateCreated { get; set; }
     public bool Completed { get; set; }
-
     public List<TrackedProgram> Programs { get; set; } = new();
     public Skill Skill { get; set; }
 

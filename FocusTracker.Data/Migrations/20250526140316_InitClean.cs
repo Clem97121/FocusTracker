@@ -80,8 +80,7 @@ namespace FocusTracker.Data.Migrations
                         .Annotation("Sqlite:Autoincrement", true),
                     RestrictionId = table.Column<int>(type: "INTEGER", nullable: false),
                     RuleType = table.Column<string>(type: "TEXT", nullable: false),
-                    Value = table.Column<string>(type: "TEXT", nullable: false),
-                    IsMandatory = table.Column<bool>(type: "INTEGER", nullable: false)
+                    Value = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -127,11 +126,11 @@ namespace FocusTracker.Data.Migrations
                     SkillId = table.Column<int>(type: "INTEGER", nullable: false),
                     EstimatedMinutes = table.Column<int>(type: "INTEGER", nullable: false),
                     Difficulty = table.Column<int>(type: "INTEGER", nullable: false),
-                    CreatedAt = table.Column<string>(type: "TEXT", nullable: false),
                     DateCreated = table.Column<DateTime>(type: "TEXT", nullable: false),
                     Completed = table.Column<bool>(type: "INTEGER", nullable: false),
                     EarnedXp = table.Column<int>(type: "INTEGER", nullable: true),
-                    ActiveSeconds = table.Column<int>(type: "INTEGER", nullable: true)
+                    ActiveSeconds = table.Column<int>(type: "INTEGER", nullable: true),
+                    IsPassive = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -178,6 +177,8 @@ namespace FocusTracker.Data.Migrations
                     IsHidden = table.Column<bool>(type: "INTEGER", nullable: false),
                     DisplayName = table.Column<string>(type: "TEXT", nullable: true),
                     IconBytes = table.Column<byte[]>(type: "BLOB", nullable: true),
+                    LastUsed = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    TotalUsageTime = table.Column<TimeSpan>(type: "TEXT", nullable: true),
                     TaskItemId = table.Column<int>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
@@ -270,9 +271,10 @@ namespace FocusTracker.Data.Migrations
                         .Annotation("Sqlite:Autoincrement", true),
                     TaskId = table.Column<int>(type: "INTEGER", nullable: false),
                     ProgramId = table.Column<int>(type: "INTEGER", nullable: false),
-                    CountedActiveMinutes = table.Column<int>(type: "INTEGER", nullable: false),
+                    CountedActiveSeconds = table.Column<int>(type: "INTEGER", nullable: false),
                     InitialActiveSeconds = table.Column<int>(type: "INTEGER", nullable: false),
-                    RecordedAt = table.Column<string>(type: "TEXT", nullable: true)
+                    RecordedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    IsFinalized = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {

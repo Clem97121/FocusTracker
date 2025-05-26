@@ -60,8 +60,6 @@ namespace FocusTracker.Data.Services
             {
                 program.IconBytes = iconBytes;
                 await _db.SaveChangesAsync();
-
-                program.RaisePropertyChanged(nameof(program.IconBytes));
             }
         }
 

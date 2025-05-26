@@ -100,17 +100,19 @@ namespace FocusTracker.Data.Services
                             {
                                 if (int.TryParse(rule.Value, out int requiredMinutes))
                                 {
-                                    var today = DateTime.Today.ToString("yyyy-MM-dd");
+                                    var today = DateTime.Today;
 
-                                    var usedMinutes = _db.TaskProgramUsages
+                                    var usedSeconds = _db.TaskProgramUsages
                                         .Include(x => x.Task)
-                                        .Where(x => x.Task.Completed && x.RecordedAt != null && x.RecordedAt.StartsWith(today))
-                                        .Sum(x => x.CountedActiveMinutes);
+                                        .Where(x => x.Task.Completed && x.RecordedAt.HasValue && x.RecordedAt.Value.Date == today)
+                                        .Sum(x => x.CountedActiveSeconds);
+
+                                    var usedMinutes = usedSeconds / 60.0;
 
                                     if (usedMinutes < requiredMinutes)
                                     {
                                         violatedNotes.Add(restriction.Note +
-                                            $" (потрібно {requiredMinutes} хв активного часу у завершених завданнях, зараз: {usedMinutes} хв)");
+                                            $" (потрібно {requiredMinutes} хв активного часу у завершених завданнях, зараз: {usedMinutes:F1} хв)");
                                     }
                                 }
                                 break;

@@ -1,46 +1,55 @@
 ﻿using System.Collections.Generic;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Runtime.CompilerServices;
+using FocusTracker.Domain;
 
-namespace FocusTracker.Domain.Models
+namespace FocusTracker.Domain.Models;
+
+public class Skill : ObservableObject
 {
-    public class Skill : INotifyPropertyChanged
+    public int Id { get; set; }
+
+    private string _name = string.Empty;
+    public string Name
     {
-        public int Id { get; set; }
+        get => _name;
+        set => Set(ref _name, value);
+    }
 
-        private string _name;
-        public string Name
-        {
-            get => _name;
-            set { _name = value; OnPropertyChanged(); }
-        }
+    private int _categoryId;
+    public int CategoryId
+    {
+        get => _categoryId;
+        set => Set(ref _categoryId, value);
+    }
 
-        public int CategoryId { get; set; }
-        public int Level { get; set; }
-        public int Xp { get; set; }
+    private int _level;
+    public int Level
+    {
+        get => _level;
+        set => Set(ref _level, value);
+    }
 
-        [NotMapped]
-        public int XpToNextLevel => (Level + 1) * 100;
+    private int _xp;
+    public int Xp
+    {
+        get => _xp;
+        set => Set(ref _xp, value);
+    }
 
-        [NotMapped]
-        public double XpProgressPercent => (double)Xp / XpToNextLevel * 100;
+    [NotMapped]
+    public int XpToNextLevel => (Level + 1) * 100;
 
+    [NotMapped]
+    public double XpProgressPercent => XpToNextLevel == 0 ? 0 : (double)Xp / XpToNextLevel * 100;
 
-        public SkillCategory Category { get; set; }
-        public ICollection<TaskItem> Tasks { get; set; }
+    public SkillCategory Category { get; set; } = null!;
+    public ICollection<TaskItem> Tasks { get; set; } = new List<TaskItem>();
 
-        [NotMapped]
-        private bool _isEditing;
-        [NotMapped]
-        public bool IsEditing
-        {
-            get => _isEditing;
-            set { _isEditing = value; OnPropertyChanged(); }
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string name = null)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    private bool _isEditing;
+    [NotMapped]
+    public bool IsEditing
+    {
+        get => _isEditing;
+        set => Set(ref _isEditing, value);
     }
 }

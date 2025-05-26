@@ -162,7 +162,7 @@ namespace FocusTracker.App.ViewModels
                 Title = NewTaskTitle,
                 Description = NewTaskDescription ?? "",
                 SkillId = SelectedSkill.Id,
-                CreatedAt = DateTime.Now.ToString("s"),
+                DateCreated = DateTime.Now,
                 Completed = false,
                 Difficulty = NewTaskDifficulty,
 
@@ -183,7 +183,7 @@ namespace FocusTracker.App.ViewModels
                 {
                     TaskId = savedTask.Id,
                     ProgramId = program.Id,
-                    CountedActiveMinutes = 0,
+                    CountedActiveSeconds = 0,
                     InitialActiveSeconds = initialActive
                 });
             }
@@ -246,7 +246,7 @@ namespace FocusTracker.App.ViewModels
             var allUsage = _taskProgramUsageService.GetAll();
             var allPrograms = _programService.GetAll().ToList();
             var allTasks = _taskService.GetAll();
-            DateTime taskCreated = DateTime.Parse(task.CreatedAt);
+            DateTime taskCreated = task.DateCreated;
 
             int totalNewActiveSeconds = 0;
             int totalPassiveSeconds = 0;
@@ -268,13 +268,13 @@ namespace FocusTracker.App.ViewModels
                 int initialActive = usage?.InitialActiveSeconds ?? 0;
 
                 var earlierTaskIds = allTasks
-                    .Where(t => DateTime.Parse(t.CreatedAt) < taskCreated)
+                    .Where(t => t.DateCreated < taskCreated)
                     .Select(t => t.Id)
                     .ToHashSet();
 
                 int alreadyUsed = allUsage
                     .Where(u => u.ProgramId == program.Id && earlierTaskIds.Contains(u.TaskId))
-                    .Select(u => u.CountedActiveMinutes)
+                    .Select(u => u.CountedActiveSeconds)
                     .DefaultIfEmpty(0)
                     .Max();
 
@@ -289,9 +289,10 @@ namespace FocusTracker.App.ViewModels
                 {
                     TaskId = task.Id,
                     ProgramId = program.Id,
-                    CountedActiveMinutes = alreadyUsed + newActiveSeconds,
+                    CountedActiveSeconds = alreadyUsed + newActiveSeconds,
                     InitialActiveSeconds = initialActive,
-                    RecordedAt = now.ToString("s")
+                    RecordedAt = now,
+                    IsFinalized = true
                 });
             }
 
@@ -353,7 +354,7 @@ namespace FocusTracker.App.ViewModels
             // Забираємо всі завершені завдання, відсортувавши за датою створення зверху вниз
             var allTasks = _taskService.GetAll()
                                        .Where(t => t.Completed)
-                                       .OrderByDescending(t => DateTime.TryParse(t.CreatedAt, out var dt) ? dt : DateTime.MinValue)
+                                       .OrderByDescending(t => t.DateCreated)
                                        .ToList();
 
             foreach (var task in allTasks)
@@ -389,7 +390,7 @@ namespace FocusTracker.App.ViewModels
             var filtered = CompletedTasks.AsEnumerable();
 
             if (HistoryFilterDate.HasValue)
-                filtered = filtered.Where(t => DateTime.TryParse(t.CreatedAt, out var date) && date.Date == HistoryFilterDate.Value.Date);
+                filtered = filtered.Where(t => t.DateCreated.Date == HistoryFilterDate.Value.Date);
 
             if (HistoryFilterSkill != null)
                 filtered = filtered.Where(t => t.SkillId == HistoryFilterSkill.Id);

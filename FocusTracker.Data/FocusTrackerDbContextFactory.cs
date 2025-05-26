@@ -1,16 +1,20 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using FocusTracker.Data;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore;
 
-namespace FocusTracker.Data
+public class FocusTrackerDbContextFactory : IDesignTimeDbContextFactory<FocusTrackerDbContext>
 {
-    public class FocusTrackerDbContextFactory : IDesignTimeDbContextFactory<FocusTrackerDbContext>
+    public FocusTrackerDbContext CreateDbContext(string[] args)
     {
-        public FocusTrackerDbContext CreateDbContext(string[] args)
-        {
-            var optionsBuilder = new DbContextOptionsBuilder<FocusTrackerDbContext>();
-            optionsBuilder.UseSqlite("Data Source=focus_tracker.db");
+        var optionsBuilder = new DbContextOptionsBuilder<FocusTrackerDbContext>();
 
-            return new FocusTrackerDbContext(optionsBuilder.Options);
-        }
+        var dbPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "FocusTracker",
+            "focus_tracker.db");
+
+        optionsBuilder.UseSqlite($"Data Source={dbPath}");
+
+        return new FocusTrackerDbContext(optionsBuilder.Options);
     }
 }

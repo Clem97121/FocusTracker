@@ -1,61 +1,71 @@
 ﻿using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Runtime.CompilerServices;
 
-namespace FocusTracker.Domain.Models
+namespace FocusTracker.Domain.Models;
+
+public class SkillCategory : ObservableObject
 {
-    public class SkillCategory : INotifyPropertyChanged
+    public int Id { get; set; }
+
+    private string _name = string.Empty;
+    public string Name
     {
-        public int Id { get; set; }
+        get => _name;
+        set => Set(ref _name, value);
+    }
 
-        private string _name;
-        public string Name
-        {
-            get => _name;
-            set { _name = value; OnPropertyChanged(); }
-        }
+    private string _color = string.Empty;
+    public string Color
+    {
+        get => _color;
+        set => Set(ref _color, value);
+    }
 
-        public string Color { get; set; }
-        public int SortOrder { get; set; }
+    private int _sortOrder;
+    public int SortOrder
+    {
+        get => _sortOrder;
+        set => Set(ref _sortOrder, value);
+    }
 
-        private bool _isEditing;
+    // UI-состояния
+    private bool _isEditing;
+    [NotMapped]
+    public bool IsEditing
+    {
+        get => _isEditing;
+        set => Set(ref _isEditing, value);
+    }
 
-        [NotMapped]
-        public bool IsEditing
-        {
-            get => _isEditing;
-            set
-            {
-                if (_isEditing != value)
-                {
-                    _isEditing = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
-        private bool _isAddingSkill;
-        [NotMapped]
-        public bool IsAddingSkill
-        {
-            get => _isAddingSkill;
-            set { _isAddingSkill = value; OnPropertyChanged(); }
-        }
-        private bool _isExpanded;
-        [NotMapped]
-        public bool IsExpanded
-        {
-            get => _isExpanded;
-            set { _isExpanded = value; OnPropertyChanged(); }
-        }
+    private bool _isAddingSkill;
+    [NotMapped]
+    public bool IsAddingSkill
+    {
+        get => _isAddingSkill;
+        set => Set(ref _isAddingSkill, value);
+    }
 
+    private bool _isExpanded;
+    [NotMapped]
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set => Set(ref _isExpanded, value);
+    }
 
-        [NotMapped] public string NewSkillName { get; set; } = "";
+    private string _newSkillName = "";
+    [NotMapped]
+    public string NewSkillName
+    {
+        get => _newSkillName;
+        set => Set(ref _newSkillName, value);
+    }
 
-        [NotMapped] public ObservableCollection<Skill> Skills { get; set; } = new();
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string name = null)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    private ObservableCollection<Skill> _skills = new();
+    [NotMapped]
+    public ObservableCollection<Skill> Skills
+    {
+        get => _skills;
+        set => Set(ref _skills, value);
     }
 }

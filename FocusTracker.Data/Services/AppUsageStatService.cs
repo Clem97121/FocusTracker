@@ -169,5 +169,42 @@ namespace FocusTracker.Data.Services
             return first?.Date ?? DateTime.Today;
         }
 
+        public async Task RecalculateAppUsageStatsForDateAsync(DateTime date)
+        {
+            // Загружаем все почасовые логи за выбранную дату
+            var hourlyLogs = await _db.HourlyAppUsageLogs
+                .Where(log => log.Date == date)
+                .ToListAsync();
+
+            if (hourlyLogs.Count == 0)
+                return; // Нет данных — ничего не делаем
+
+            // Группируем по AppName
+            var grouped = hourlyLogs
+                .GroupBy(log => log.AppName)
+                .Select(g => new AppUsageStat
+                {
+                    AppName = g.Key,
+                    Date = date,
+                    TotalTime = TimeSpan.FromSeconds(g.Sum(x => x.TotalTime.TotalSeconds)),
+                    ActiveTime = TimeSpan.FromSeconds(g.Sum(x => x.ActiveTime.TotalSeconds))
+                })
+                .ToList();
+
+            // Удаляем старые дневные записи за эту дату
+            var oldStats = await _db.AppUsageStats
+                .Where(s => s.Date == date)
+                .ToListAsync();
+
+            _db.AppUsageStats.RemoveRange(oldStats);
+            _db.AppUsageStats.AddRange(grouped);
+
+            await _db.SaveChangesAsync();
+        }
+
+        public Task RecalculateTodayAsync() =>
+                    RecalculateAppUsageStatsForDateAsync(DateTime.Today);
+
+
     }
 }

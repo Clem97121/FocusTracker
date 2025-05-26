@@ -138,9 +138,6 @@ namespace FocusTracker.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<bool>("IsMandatory")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("RestrictionId")
                         .HasColumnType("INTEGER");
 
@@ -249,16 +246,19 @@ namespace FocusTracker.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("CountedActiveMinutes")
+                    b.Property<int>("CountedActiveSeconds")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("InitialActiveSeconds")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsFinalized")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("ProgramId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("RecordedAt")
+                    b.Property<DateTime?>("RecordedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("TaskId")
@@ -299,12 +299,18 @@ namespace FocusTracker.Data.Migrations
                     b.Property<bool>("IsTracked")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime?>("LastUsed")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("TaskItemId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<TimeSpan?>("TotalUsageTime")
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -324,10 +330,6 @@ namespace FocusTracker.Data.Migrations
 
                     b.Property<bool>("Completed")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("CreatedAt")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("DateCreated")
                         .HasColumnType("TEXT");

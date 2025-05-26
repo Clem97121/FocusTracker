@@ -5,6 +5,6 @@ public class TaskProgram
     public int TaskId { get; set; }
     public int ProgramId { get; set; }
 
-    public TaskItem Task { get; set; }
-    public TrackedProgram Program { get; set; }
+    public TaskItem Task { get; set; } = null!;
+    public TrackedProgram Program { get; set; } = null!;
 }

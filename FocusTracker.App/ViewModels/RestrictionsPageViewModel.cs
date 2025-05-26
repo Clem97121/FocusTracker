@@ -187,7 +187,6 @@ namespace FocusTracker.App.ViewModels
                 {
                     RuleType = SelectedRuleType.Type,
                     Value = ruleValue,
-                    IsMandatory = true,
                     DisplayName = SelectedRuleType.DisplayName
                 });
 
@@ -208,7 +207,6 @@ namespace FocusTracker.App.ViewModels
                         {
                             RuleType = SelectedRuleType.Type,
                             Value = ruleValue,
-                            IsMandatory = true,
                             DisplayName = SelectedRuleType.DisplayName
                         }
                     },

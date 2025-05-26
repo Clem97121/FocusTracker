@@ -48,9 +48,11 @@ namespace FocusTracker.App
         {
             base.OnStartup(e);
 
+
             AddToStartup();
 
             ConfigureServices();
+
 
             using (var scope = Services.CreateScope())
             {
