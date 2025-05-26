@@ -5,8 +5,8 @@
         public int Id { get; set; }
         public int TaskId { get; set; }
         public int XpEarned { get; set; }
-        public string RecordedAt { get; set; }
+        public string RecordedAt { get; set; } = string.Empty;
 
-        public TaskItem Task { get; set; }
+        public TaskItem? Task { get; set; } 
     }
 }

@@ -16,7 +16,6 @@ namespace FocusTracker.Data
         public DbSet<ExperienceHistory> ExperienceHistories { get; set; }
         public DbSet<TrackedProgram> TrackedPrograms { get; set; }
         public DbSet<TaskProgram> TaskPrograms { get; set; }
-        public DbSet<ProgramUsageLog> ProgramUsageLogs { get; set; }
         public DbSet<TaskProgramUsage> TaskProgramUsages { get; set; }
         public DbSet<Restriction> Restrictions { get; set; }
         public DbSet<RestrictionRule> RestrictionRules { get; set; }

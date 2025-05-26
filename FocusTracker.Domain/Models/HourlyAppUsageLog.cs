@@ -9,7 +9,7 @@ namespace FocusTracker.Domain.Models
     public class HourlyAppUsageLog
     {
         public int Id { get; set; }
-        public string AppName { get; set; }
+        public string AppName { get; set; } = string.Empty;
         public DateTime Date { get; set; }  // Тільки дата
         public int Hour { get; set; }       // Від 0 до 23
         public TimeSpan TotalTime { get; set; }

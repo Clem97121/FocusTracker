@@ -192,28 +192,6 @@ namespace FocusTracker.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ProgramUsageLogs",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    ProgramId = table.Column<int>(type: "INTEGER", nullable: false),
-                    Date = table.Column<string>(type: "TEXT", nullable: false),
-                    ActiveDuration = table.Column<int>(type: "INTEGER", nullable: false),
-                    TotalDuration = table.Column<int>(type: "INTEGER", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ProgramUsageLogs", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_ProgramUsageLogs_TrackedPrograms_ProgramId",
-                        column: x => x.ProgramId,
-                        principalTable: "TrackedPrograms",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "RestrictionToProgram",
                 columns: table => new
                 {
@@ -299,11 +277,6 @@ namespace FocusTracker.Data.Migrations
                 column: "TaskId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_ProgramUsageLogs_ProgramId",
-                table: "ProgramUsageLogs",
-                column: "ProgramId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_RestrictionRules_RestrictionId",
                 table: "RestrictionRules",
                 column: "RestrictionId");
@@ -360,9 +333,6 @@ namespace FocusTracker.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "HourlyAppUsageLogs");
-
-            migrationBuilder.DropTable(
-                name: "ProgramUsageLogs");
 
             migrationBuilder.DropTable(
                 name: "RestrictionRules");

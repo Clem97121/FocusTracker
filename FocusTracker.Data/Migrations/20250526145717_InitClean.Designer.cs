@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FocusTracker.Data.Migrations
 {
     [DbContext(typeof(FocusTrackerDbContext))]
-    [Migration("20250526140316_InitClean")]
+    [Migration("20250526145717_InitClean")]
     partial class InitClean
     {
         /// <inheritdoc />
@@ -92,32 +92,6 @@ namespace FocusTracker.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("HourlyAppUsageLogs");
-                });
-
-            modelBuilder.Entity("FocusTracker.Domain.Models.ProgramUsageLog", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("ActiveDuration")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Date")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("ProgramId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("TotalDuration")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProgramId");
-
-                    b.ToTable("ProgramUsageLogs");
                 });
 
             modelBuilder.Entity("FocusTracker.Domain.Models.Restriction", b =>
@@ -376,17 +350,6 @@ namespace FocusTracker.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Task");
-                });
-
-            modelBuilder.Entity("FocusTracker.Domain.Models.ProgramUsageLog", b =>
-                {
-                    b.HasOne("FocusTracker.Domain.Models.TrackedProgram", "Program")
-                        .WithMany()
-                        .HasForeignKey("ProgramId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Program");
                 });
 
             modelBuilder.Entity("FocusTracker.Domain.Models.RestrictionRule", b =>

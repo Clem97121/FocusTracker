@@ -91,32 +91,6 @@ namespace FocusTracker.Data.Migrations
                     b.ToTable("HourlyAppUsageLogs");
                 });
 
-            modelBuilder.Entity("FocusTracker.Domain.Models.ProgramUsageLog", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("ActiveDuration")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Date")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("ProgramId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("TotalDuration")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProgramId");
-
-                    b.ToTable("ProgramUsageLogs");
-                });
-
             modelBuilder.Entity("FocusTracker.Domain.Models.Restriction", b =>
                 {
                     b.Property<int>("Id")
@@ -373,17 +347,6 @@ namespace FocusTracker.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Task");
-                });
-
-            modelBuilder.Entity("FocusTracker.Domain.Models.ProgramUsageLog", b =>
-                {
-                    b.HasOne("FocusTracker.Domain.Models.TrackedProgram", "Program")
-                        .WithMany()
-                        .HasForeignKey("ProgramId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Program");
                 });
 
             modelBuilder.Entity("FocusTracker.Domain.Models.RestrictionRule", b =>
