@@ -29,10 +29,10 @@ namespace FocusTracker.Data.Services
             await _db.SaveChangesAsync();
         }
 
-        public void Add(TrackedProgram program)
+        public async Task AddAsync(TrackedProgram program)
         {
-            _db.TrackedPrograms.Add(program);
-            _db.SaveChanges();
+            await _db.TrackedPrograms.AddAsync(program);
+            await _db.SaveChangesAsync();
         }
 
         public async Task UpdateDisplayNameIfNeededAsync(string identifier, string displayName)
@@ -63,8 +63,7 @@ namespace FocusTracker.Data.Services
             }
         }
 
-        // ✅ Новый метод, делегируем в TrackedProgramService
-        public async Task UpdateDisplayInfoIfNeededAsync(TrackedProgram program)
+        public async Task UpdateDisplayNameAndIconIfNeededAsync(TrackedProgram program)
         {
             await _trackedProgramService.UpdateDisplayInfoIfNeededAsync(program);
         }

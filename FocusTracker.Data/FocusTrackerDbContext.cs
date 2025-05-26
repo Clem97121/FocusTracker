@@ -68,6 +68,22 @@ namespace FocusTracker.Data
                 .HasForeignKey(s => s.CategoryId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // === RestrictionToProgram: связь Ограничение <-> Программа
+
+            modelBuilder.Entity<RestrictionToProgram>()
+                .HasKey(rp => new { rp.RestrictionId, rp.ProgramId });
+
+            modelBuilder.Entity<RestrictionToProgram>()
+                .HasOne(rp => rp.Restriction)
+                .WithMany(r => r.Targets)
+                .HasForeignKey(rp => rp.RestrictionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<RestrictionToProgram>()
+                .HasOne(rp => rp.Program)
+                .WithMany()
+                .HasForeignKey(rp => rp.ProgramId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

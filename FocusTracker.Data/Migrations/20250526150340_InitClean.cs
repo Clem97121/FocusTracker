@@ -195,14 +195,13 @@ namespace FocusTracker.Data.Migrations
                 name: "RestrictionToProgram",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
                     RestrictionId = table.Column<int>(type: "INTEGER", nullable: false),
-                    ProgramId = table.Column<int>(type: "INTEGER", nullable: false)
+                    ProgramId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_RestrictionToProgram", x => x.Id);
+                    table.PrimaryKey("PK_RestrictionToProgram", x => new { x.RestrictionId, x.ProgramId });
                     table.ForeignKey(
                         name: "FK_RestrictionToProgram_Restrictions_RestrictionId",
                         column: x => x.RestrictionId,
@@ -285,11 +284,6 @@ namespace FocusTracker.Data.Migrations
                 name: "IX_RestrictionToProgram_ProgramId",
                 table: "RestrictionToProgram",
                 column: "ProgramId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_RestrictionToProgram_RestrictionId",
-                table: "RestrictionToProgram",
-                column: "RestrictionId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Skills_CategoryId",

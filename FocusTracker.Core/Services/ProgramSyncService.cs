@@ -54,7 +54,7 @@ namespace FocusTracker.Core.Services
                         IsHidden = false
                     };
 
-                    _programService.Add(program);
+                    await _programService.AddAsync(program);
                 }
             }
         }

@@ -132,21 +132,18 @@ namespace FocusTracker.Data.Migrations
 
             modelBuilder.Entity("FocusTracker.Domain.Models.RestrictionToProgram", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<int>("RestrictionId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("ProgramId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("RestrictionId")
+                    b.Property<int>("Id")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Id");
+                    b.HasKey("RestrictionId", "ProgramId");
 
                     b.HasIndex("ProgramId");
-
-                    b.HasIndex("RestrictionId");
 
                     b.ToTable("RestrictionToProgram");
                 });

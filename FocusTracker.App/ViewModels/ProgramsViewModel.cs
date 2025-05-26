@@ -68,7 +68,7 @@ namespace FocusTracker.App.ViewModels
             foreach (var program in _allPrograms)
             {
                 // 👇 этот метод мы реализовали в TrackedProgramService
-                await _programService.UpdateDisplayInfoIfNeededAsync(program);
+                await _programService.UpdateDisplayNameAndIconIfNeededAsync(program);
 
                 program.PropertyChanged += async (sender, e) =>
                 {

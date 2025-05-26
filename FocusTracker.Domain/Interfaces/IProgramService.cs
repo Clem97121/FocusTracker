@@ -8,12 +8,12 @@ namespace FocusTracker.Domain.Interfaces
     {
         Task<List<TrackedProgram>> GetAllAsync();
         Task UpdateAsync(TrackedProgram program);
-        void Add(TrackedProgram program);
+        Task AddAsync(TrackedProgram program);
 
         Task UpdateDisplayNameIfNeededAsync(string identifier, string displayName);
         Task UpdateIconIfNeededAsync(string identifier, byte[] iconBytes);
 
         // ✅ добавляем новый метод
-        Task UpdateDisplayInfoIfNeededAsync(TrackedProgram program);
+        Task UpdateDisplayNameAndIconIfNeededAsync(TrackedProgram program);
     }
 }
