@@ -64,6 +64,12 @@
                         <TextBlock Text="Орієнтовний час (хв)" Foreground="White" Margin="0 10 0 0"/>
                         <TextBox Text="{Binding NewTaskEstimatedMinutes}" Style="{StaticResource TextBoxStyle}"/>
 
+                        <CheckBox Content="Пасивне завдання (перегляд відео, лекція)"
+                                  IsChecked="{Binding NewTaskIsPassive}"
+                                  Style="{StaticResource LeftAlignedCheckBox}"
+                                  Margin="5,10,10,5"/>
+
+
                         <TextBlock Text="Програми" Foreground="White" Margin="0 10 0 4"/>
                         <ComboBox ItemsSource="{Binding AvailablePrograms}"
                                   SelectionChanged="ProgramsComboBox_SelectionChanged"

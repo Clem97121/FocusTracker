@@ -23,5 +23,6 @@ public class TaskItem
     public DateTime? LastRemindedAt { get; set; }
     public int? EarnedXp { get; set; }      // 🔹 nullable, бо є незавершені задачі
     public int? ActiveSeconds { get; set; } // 🔹 теж nullable
+    public bool IsPassive { get; set; } = false;
 
 }

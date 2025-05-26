@@ -1,62 +1,70 @@
-﻿using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
+﻿using FocusTracker.Domain;
 namespace FocusTracker.Domain.Models;
 
-public class TrackedProgram : INotifyPropertyChanged
+public class TrackedProgram : ObservableObject
 {
     public int Id { get; set; }
 
-    private string _name;
+    private string _name = string.Empty;
     public string Name
     {
         get => _name;
-        set { _name = value; RaisePropertyChanged(); }
+        set => Set(ref _name, value);
     }
 
-    private string _identifier;
+    private string _identifier = string.Empty;
     public string Identifier
     {
         get => _identifier;
-        set { _identifier = value; RaisePropertyChanged(); }
+        set => Set(ref _identifier, value);
     }
 
-    private string _category;
+    private string _category = string.Empty;
     public string Category
     {
         get => _category;
-        set { _category = value; RaisePropertyChanged(); }
+        set => Set(ref _category, value);
     }
 
     private bool _isTracked;
     public bool IsTracked
     {
         get => _isTracked;
-        set { _isTracked = value; RaisePropertyChanged(); }
+        set => Set(ref _isTracked, value);
     }
 
     private bool _isHidden;
     public bool IsHidden
     {
         get => _isHidden;
-        set { _isHidden = value; RaisePropertyChanged(); }
+        set => Set(ref _isHidden, value);
     }
 
     private string? _displayName;
     public string? DisplayName
     {
         get => _displayName;
-        set { _displayName = value; RaisePropertyChanged(); }
+        set => Set(ref _displayName, value);
     }
 
     private byte[]? _iconBytes;
     public byte[]? IconBytes
     {
         get => _iconBytes;
-        set { _iconBytes = value; RaisePropertyChanged(); }
+        set => Set(ref _iconBytes, value);
     }
 
-    public event PropertyChangedEventHandler PropertyChanged;
-    public void RaisePropertyChanged([CallerMemberName] string name = null)
-        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    private DateTime? _lastUsed;
+    public DateTime? LastUsed
+    {
+        get => _lastUsed;
+        set => Set(ref _lastUsed, value);
+    }
+
+    private TimeSpan? _totalUsageTime;
+    public TimeSpan? TotalUsageTime
+    {
+        get => _totalUsageTime;
+        set => Set(ref _totalUsageTime, value);
+    }
 }

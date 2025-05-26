@@ -57,6 +57,47 @@
         </Setter>
     </Style>
 
+    <Style x:Key="LeftAlignedCheckBox"
+       TargetType="CheckBox"
+       BasedOn="{StaticResource {x:Type CheckBox}}">
+
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="Padding" Value="4,2"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="16" Height="16"
+                            BorderBrush="White"
+                            BorderThickness="2"
+                            CornerRadius="2"
+                            Background="Transparent"
+                            VerticalAlignment="Center"
+                            Margin="0,0,6,0">
+                            <Path x:Name="CheckMark"
+                              Data="M 0 6 L 4 10 L 12 2"
+                              Stroke="White"
+                              StrokeThickness="2"
+                              Visibility="Collapsed"/>
+                        </Border>
+                        <ContentPresenter VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 
     <!-- ✅ ComboBox -->
     <Style x:Key="ComboBoxToggleButton" TargetType="ToggleButton">
@@ -804,6 +845,53 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+
+
+    <Style x:Key="SidebarNavButtonStyle" TargetType="Button">
+        <Setter Property="Width" Value="60"/>
+        <Setter Property="Height" Value="60"/>
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="Margin" Value="5"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Border"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="10"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="0">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <!-- Наведение -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{StaticResource SecondAccentBrush}"/>
+                        </Trigger>
+
+                        <!-- Нажатие -->
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{StaticResource PrimaryBrush}"/>
+                        </Trigger>
+
+                        <!-- Активная страница -->
+                        <Trigger Property="Tag" Value="active">
+                            <Setter TargetName="Border" Property="Background" Value="{StaticResource PrimaryBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+
+
 
 
 </ResourceDictionary>

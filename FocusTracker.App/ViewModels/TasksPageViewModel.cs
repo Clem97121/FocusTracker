@@ -96,6 +96,7 @@ namespace FocusTracker.App.ViewModels
             set { _historyFilterProgram = value; OnPropertyChanged(); UpdateFilteredHistory(); }
         }
 
+        public bool NewTaskIsPassive { get; set; }
         public TasksPageViewModel(
             ITaskItemService taskService,
             ISkillService skillService,
@@ -164,6 +165,7 @@ namespace FocusTracker.App.ViewModels
                 CreatedAt = DateTime.Now.ToString("s"),
                 Completed = false,
                 Difficulty = NewTaskDifficulty,
+
                 EstimatedMinutes = NewTaskEstimatedMinutes
             };
 
@@ -236,8 +238,6 @@ namespace FocusTracker.App.ViewModels
 
         public async Task<int> CompleteTask(TaskItem task)
         {
-            int totalNewActiveSeconds = 0;
-
             if (task.Completed) return 0;
 
             var today = DateTime.Today;
@@ -248,26 +248,24 @@ namespace FocusTracker.App.ViewModels
             var allTasks = _taskService.GetAll();
             DateTime taskCreated = DateTime.Parse(task.CreatedAt);
 
-            Debug.WriteLine($"🔧 Завершення завдання: {task.Title} (ID {task.Id})");
-            Debug.WriteLine($"📅 Створено: {taskCreated}");
+            int totalNewActiveSeconds = 0;
+            int totalPassiveSeconds = 0;
 
-            foreach (var program in task.Programs.ToList()) // уникнення помилки модифікації колекції
+            foreach (var program in task.Programs.ToList())
             {
-                Debug.WriteLine($"➡ Програма: {program.DisplayName} ({program.Identifier})");
-
                 var stat = statsList.FirstOrDefault(s => s.AppName == program.Identifier);
-                if (stat == null)
+                if (stat == null) continue;
+
+                if (task.IsPassive)
                 {
-                    Debug.WriteLine("  ⛔ Немає статистики за програму.");
+                    int total = (int)stat.TotalTime.TotalSeconds;
+                    totalPassiveSeconds += total;
                     continue;
                 }
 
                 int totalActive = (int)stat.ActiveTime.TotalSeconds;
                 var usage = allUsage.FirstOrDefault(u => u.TaskId == task.Id && u.ProgramId == program.Id);
                 int initialActive = usage?.InitialActiveSeconds ?? 0;
-
-                Debug.WriteLine($"  📊 Активний час (загалом): {totalActive} сек");
-                Debug.WriteLine($"  🟦 Початковий активний час: {initialActive} сек");
 
                 var earlierTaskIds = allTasks
                     .Where(t => DateTime.Parse(t.CreatedAt) < taskCreated)
@@ -280,18 +278,10 @@ namespace FocusTracker.App.ViewModels
                     .DefaultIfEmpty(0)
                     .Max();
 
-                Debug.WriteLine($"  🔁 Уже використано в інших завданнях: {alreadyUsed} сек");
-
                 int effectiveBase = Math.Max(initialActive, alreadyUsed);
                 int newActiveSeconds = totalActive - effectiveBase;
 
-                Debug.WriteLine($"  ✅ Новий активний час: {newActiveSeconds} сек");
-
-                if (newActiveSeconds <= 0)
-                {
-                    Debug.WriteLine("  ⚠ Новий час ≤ 0 — пропуск.");
-                    continue;
-                }
+                if (newActiveSeconds <= 0) continue;
 
                 totalNewActiveSeconds += newActiveSeconds;
 
@@ -305,23 +295,20 @@ namespace FocusTracker.App.ViewModels
                 });
             }
 
-            if (totalNewActiveSeconds > 0)
-            {
-                int earnedXp = totalNewActiveSeconds * task.Difficulty;
+            int finalSeconds = task.IsPassive ? totalPassiveSeconds : totalNewActiveSeconds;
 
-                Debug.WriteLine($"🎁 Загалом активного часу: {totalNewActiveSeconds} сек");
-                Debug.WriteLine($"🌟 Нараховано досвіду: {earnedXp} XP");
+            if (finalSeconds > 0)
+            {
+                int earnedXp = finalSeconds * task.Difficulty;
 
                 _skillService.AddXp(task.SkillId, earnedXp);
 
-                // ✅ Зберігаємо досвід і активний час у TaskItem
                 task.Completed = true;
                 task.EarnedXp = earnedXp;
-                task.ActiveSeconds = totalNewActiveSeconds;
+                task.ActiveSeconds = finalSeconds;
 
                 _taskService.Update(task);
 
-                // Додатково — зберігаємо в ExperienceHistory
                 var db = App.Services.GetRequiredService<FocusTrackerDbContext>();
                 db.ExperienceHistories.Add(new ExperienceHistory
                 {
@@ -337,9 +324,9 @@ namespace FocusTracker.App.ViewModels
                 return earnedXp;
             }
 
-            Debug.WriteLine("❌ Нуль нового активного часу. Досвід не нараховано.");
             return 0;
         }
+
 
 
 

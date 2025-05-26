@@ -152,15 +152,18 @@
                             </Grid>
 
                             <!-- Колонка с временем -->
-                            <StackPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <StackPanel Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Minutes, Converter={StaticResource DurationToReadableStringConverter}}" 
                Foreground="White"
-               FontSize="12"/>
+               FontSize="12"
+               TextAlignment="Left"/>
                                 <TextBlock Text="{Binding ActiveMinutes, Converter={StaticResource DurationToReadableStringConverter}, StringFormat=активно: {0}}" 
                Foreground="White"
                FontSize="10"
-               Opacity="0.6"/>
+               Opacity="0.6"
+               TextAlignment="Left"/>
                             </StackPanel>
+
                         </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

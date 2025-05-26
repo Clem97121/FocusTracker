@@ -13,7 +13,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows.Media;
-using System.Windows; // 👈 добавь это
+using System.Windows;
 
 
 namespace FocusTracker.App.ViewModels
@@ -188,21 +188,24 @@ namespace FocusTracker.App.ViewModels
                     Values = unprodValues,
                     Name = "Непродуктивні",
                     Fill = new SolidColorPaint(SKColors.IndianRed),
-                    DataLabelsFormatter = point => double.IsNaN(point.Model) ? string.Empty : $"{Math.Round(point.Model, 1)} хв"
+                    DataLabelsFormatter = point => double.IsNaN(point.Model) ? string.Empty : $"{Math.Round(point.Model)} хв"
+
                 },
                 new StackedColumnSeries<double>
                 {
                     Values = neuValues,
                     Name = "Суміжні",
                     Fill = new SolidColorPaint(SKColors.Gold),
-                    DataLabelsFormatter = point => double.IsNaN(point.Model) ? string.Empty : $"{Math.Round(point.Model, 1)} хв"
+                    DataLabelsFormatter = point => double.IsNaN(point.Model) ? string.Empty : $"{Math.Round(point.Model)} хв"
+
                 },
                 new StackedColumnSeries<double>
                 {
                     Values = prodValues,
                     Name = "Продуктивні",
                     Fill = new SolidColorPaint(SKColors.LimeGreen),
-                    DataLabelsFormatter = point => double.IsNaN(point.Model) ? string.Empty : $"{Math.Round(point.Model, 1)} хв"
+                    DataLabelsFormatter = point => double.IsNaN(point.Model) ? string.Empty : $"{Math.Round(point.Model)} хв"
+
                 }
             };
 

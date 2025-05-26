@@ -80,21 +80,27 @@
                             Background="{StaticResource AccentBrush}"
                             Orientation="Vertical"
                             VerticalAlignment="Stretch">
-                    <Button Content="📊" ToolTip="Статистика" Height="70" Margin="5"
-                            Background="Transparent" Foreground="White" BorderBrush="Transparent"
-                            Click="ShowStatsPage"/>
-                    <Button Content="🧠" ToolTip="Навички" Height="70" Margin="5"
-                            Background="Transparent" Foreground="White" BorderBrush="Transparent"
-                            Click="ShowSkillsPage"/>
-                    <Button Content="✅" ToolTip="Завдання" Height="70" Margin="5"
-                            Background="Transparent" Foreground="White" BorderBrush="Transparent"
-                            Click="ShowTasksPage"/>
-                    <Button Content="🔒" ToolTip="Обмеження" Height="70" Margin="5"
-                            Background="Transparent" Foreground="White" BorderBrush="Transparent"
-                            Click="ShowRestrictionsPage"/>
-                    <Button Content="!" ToolTip="Застосунки" Height="70" Margin="5"
-                            Background="Transparent" Foreground="White" BorderBrush="Transparent"
-                            Click="ShowProgramsPage"/>
+                    <Button x:Name="StatsButton" 
+                            Content="📊" ToolTip="Статистика"
+        Style="{StaticResource SidebarNavButtonStyle}"
+        Click="ShowStatsPage"/>
+
+                    <Button Content="🧠" ToolTip="Навички"
+        Style="{StaticResource SidebarNavButtonStyle}"
+        Click="ShowSkillsPage"/>
+
+                    <Button Content="✅" ToolTip="Завдання"
+        Style="{StaticResource SidebarNavButtonStyle}"
+        Click="ShowTasksPage"/>
+
+                    <Button Content="🔒" ToolTip="Обмеження"
+        Style="{StaticResource SidebarNavButtonStyle}"
+        Click="ShowRestrictionsPage"/>
+
+                    <Button Content="!" ToolTip="Застосунки"
+        Style="{StaticResource SidebarNavButtonStyle}"
+        Click="ShowProgramsPage"/>
+
                 </StackPanel>
 
                 <!-- ОСНОВНОЙ КОНТЕНТ -->
