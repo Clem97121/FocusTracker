@@ -4,32 +4,43 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using FocusTracker.App.Views;
+using System;
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
+
 
 namespace FocusTracker.App
 {
     public partial class MainWindow : Window
     {
        public MainWindow()
-{
-    InitializeComponent();
-
-    // Устанавливаем контент и заголовок
-    MainContent.Content = new StatsPage();
-    SetPageTitle("Статистика");
-
-    // Подсвечиваем кнопку статистики
-    HighlightNavButton(StatsButton);
-
-    SizeChanged += (s, e) =>
-    {
-        MainBorder.Clip = new RectangleGeometry
         {
-            Rect = new Rect(0, 0, ActualWidth, ActualHeight),
-            RadiusX = 20,
-            RadiusY = 20
-        };
-    };
-}
+            InitializeComponent();
+
+            SourceInitialized += (s, e) =>
+            {
+                var hwnd = new WindowInteropHelper(this).Handle;
+                HwndSource.FromHwnd(hwnd).AddHook(WindowProc);
+            };
+
+
+            // Устанавливаем контент и заголовок
+            MainContent.Content = new StatsPage();
+            SetPageTitle("Статистика");
+
+            // Подсвечиваем кнопку статистики
+            HighlightNavButton(StatsButton);
+
+            SizeChanged += (s, e) =>
+            {
+                MainBorder.Clip = new RectangleGeometry
+                {
+                    Rect = new Rect(0, 0, ActualWidth, ActualHeight),
+                    RadiusX = 20,
+                    RadiusY = 20
+                };
+            };
+        }
 
 
         private Button _currentNavButton;
@@ -118,5 +129,82 @@ namespace FocusTracker.App
             SetPageTitle("Застосунки");
             HighlightNavButton((Button)sender);
         }
+
+        private const int WM_NCHITTEST = 0x0084;
+        private const int HTLEFT = 10;
+        private const int HTRIGHT = 11;
+        private const int HTTOP = 12;
+        private const int HTTOPLEFT = 13;
+        private const int HTTOPRIGHT = 14;
+        private const int HTBOTTOM = 15;
+        private const int HTBOTTOMLEFT = 16;
+        private const int HTBOTTOMRIGHT = 17;
+        private const int HTCLIENT = 1;
+
+        private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WM_NCHITTEST)
+            {
+                Point mousePos = GetMousePosition(lParam);
+                double edge = 8; // ширина зоны для resize
+
+                if (mousePos.Y <= edge)
+                {
+                    if (mousePos.X <= edge)
+                    {
+                        handled = true;
+                        return (IntPtr)HTTOPLEFT;
+                    }
+                    else if (mousePos.X >= ActualWidth - edge)
+                    {
+                        handled = true;
+                        return (IntPtr)HTTOPRIGHT;
+                    }
+                    else
+                    {
+                        handled = true;
+                        return (IntPtr)HTTOP;
+                    }
+                }
+                else if (mousePos.Y >= ActualHeight - edge)
+                {
+                    if (mousePos.X <= edge)
+                    {
+                        handled = true;
+                        return (IntPtr)HTBOTTOMLEFT;
+                    }
+                    else if (mousePos.X >= ActualWidth - edge)
+                    {
+                        handled = true;
+                        return (IntPtr)HTBOTTOMRIGHT;
+                    }
+                    else
+                    {
+                        handled = true;
+                        return (IntPtr)HTBOTTOM;
+                    }
+                }
+                else if (mousePos.X <= edge)
+                {
+                    handled = true;
+                    return (IntPtr)HTLEFT;
+                }
+                else if (mousePos.X >= ActualWidth - edge)
+                {
+                    handled = true;
+                    return (IntPtr)HTRIGHT;
+                }
+            }
+
+            return IntPtr.Zero;
+        }
+
+        private Point GetMousePosition(IntPtr lParam)
+        {
+            int x = (short)((uint)lParam & 0xFFFF);
+            int y = (short)(((uint)lParam >> 16) & 0xFFFF);
+            return PointFromScreen(new Point(x, y));
+        }
+
     }
 }

@@ -52,4 +52,7 @@ public class Skill : ObservableObject
         get => _isEditing;
         set => Set(ref _isEditing, value);
     }
+    [NotMapped]
+    public string XpDisplay => $"{Xp} / {XpToNextLevel} XP";
+
 }

@@ -13,6 +13,9 @@ using FocusTracker.Domain.Models;
 using FocusTracker.App.Services;
 using System.IO;
 using Microsoft.Win32;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.IO.Pipes;
 
 namespace FocusTracker.App
 {
@@ -29,15 +32,63 @@ namespace FocusTracker.App
         private Timer _notificationTimer;
         private Timer _impulseTimer;
 
+        private Mutex? _mutex;
+
         private readonly Dictionary<string, DateTime> _violationCache = new();
-        private readonly HashSet<string> _notifiedProcesses = new(); // в App.cs (глобально)
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        private void StartPipeServer()
+        {
+            Task.Run(() =>
+            {
+                while (true)
+                {
+                    try
+                    {
+                        using var server = new NamedPipeServerStream("FocusTrackerPipe", PipeDirection.In);
+                        server.WaitForConnection();
+
+                        using var reader = new StreamReader(server);
+                        var message = reader.ReadLine();
+
+                        if (message == "SHOW")
+                        {
+                            Dispatcher.Invoke(() =>
+                            {
+                                var win = Current.MainWindow;
+
+                                win.ShowInTaskbar = true;
+                                win.Show();
+                                win.WindowState = WindowState.Normal;
+
+                                win.Topmost = true;           // принудительно наверх
+                                win.Activate();               // активировать
+                                win.Focus();                  // попытаться получить фокус
+                                win.Topmost = false;          // вернуть как было
+                            });
+                        }
+
+                    }
+                    catch { /* игнор */ }
+                }
+            });
+        }
+
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
 
         private void AddToStartup()
         {
             string appName = "FocusTracker";
             string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
 
-            using RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
+            using RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\\Microsoft\\Windows\\CurrentVersion\\Run", true);
             if (key.GetValue(appName) == null)
             {
                 key.SetValue(appName, $"\"{exePath}\"");
@@ -46,34 +97,47 @@ namespace FocusTracker.App
 
         protected override async void OnStartup(StartupEventArgs e)
         {
+            const string mutexName = "FocusTrackerAppSingleton";
+            bool createdNew;
+            _mutex = new Mutex(true, mutexName, out createdNew);
+
+            if (!createdNew)
+            {
+                try
+                {
+                    using var client = new NamedPipeClientStream(".", "FocusTrackerPipe", PipeDirection.Out);
+                    client.Connect(1000); // таймаут 1 сек
+                    using var writer = new StreamWriter(client) { AutoFlush = true };
+                    writer.WriteLine("SHOW");
+                }
+                catch { /* первая копия может ещё не готова */ }
+
+                Shutdown();
+                return;
+            }
+
+
             base.OnStartup(e);
 
-
             AddToStartup();
-
             ConfigureServices();
 
+            StartPipeServer();
 
             using (var scope = Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<FocusTrackerDbContext>();
-                db.Database.Migrate(); // автоматическое создание БД и таблиц
+                db.Database.Migrate();
             }
 
-            ShowUiNotification = message =>
-            {
-                var box = new Views.CustomMessageBox(message);
-                box.ShowDialog();
-            };
+            ShowUiNotification = message => new CustomMessageBox(message).ShowDialog();
 
-            // ✅ Синхронизация программ (через Scope)
             using (var scope = Services.CreateScope())
             {
                 var syncService = Services.GetRequiredService<ProgramSyncService>();
                 await syncService.SyncAsync();
             }
 
-            // ✅ Запуск уведомлений об ограничениях
             _notificationTimer = new Timer(async _ =>
             {
                 using var scope = Services.CreateScope();
@@ -81,18 +145,13 @@ namespace FocusTracker.App
                 await service.CheckAndNotifyAsync();
             }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
 
-            // ✅ Запуск імпульсних нагадувань
             _impulseTimer = new Timer(async _ =>
             {
                 using var scope = Services.CreateScope();
                 var service = scope.ServiceProvider.GetRequiredService<IImpulseReminderService>();
                 await service.CheckAndRemindAsync();
-            }, null,
-               TimeSpan.FromHours(1),    // перший виклик через годину
-               TimeSpan.FromHours(1));   // далі — щогодини
+            }, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
 
-
-            // ✅ Ініціалізація трекера активних вікон
             var userActivity = new UserActivityTracker();
             userActivity.Start();
 
@@ -114,35 +173,31 @@ namespace FocusTracker.App
                     var todayStat = stats.FirstOrDefault(s => s.AppName == appName);
                     var total = todayStat?.TotalTime ?? TimeSpan.Zero;
 
-                    if (!evaluator.TryGetViolatedRestrictions(appName, total, out var notes))
-                        return;
+                    if (!evaluator.TryGetViolatedRestrictions(appName, total, out var notes)) return;
 
                     var cacheKey = $"{appName}_{string.Join(",", notes)}";
-                    if (_violationCache.TryGetValue(cacheKey, out var lastShown) &&
-                        (DateTime.Now - lastShown).TotalSeconds < 5)
+                    if (_violationCache.TryGetValue(cacheKey, out var lastShown) && (DateTime.Now - lastShown).TotalSeconds < 5)
                         return;
 
                     _violationCache[cacheKey] = DateTime.Now;
-
                     var message = $"Програму \"{appName}\" було закрито через перевищення обмеження:\n• {string.Join("\n• ", notes)}";
                     notifier.ShowMessage(message, "Обмеження перевищено");
 
                     var processes = Process.GetProcessesByName(appName);
                     foreach (var proc in processes)
                     {
-                        try { proc.Kill(); }
-                        catch { /* Опціонально можна логувати помилки */ }
+                        try { proc.Kill(); } catch { }
                     }
                 },
                 programServiceForTracker,
                 nameResolver
             );
 
-
             _windowTracker.Start();
             SetupTrayIcon();
 
             var mainWindow = new MainWindow();
+            MainWindow = mainWindow;
             mainWindow.Show();
         }
 
@@ -151,15 +206,14 @@ namespace FocusTracker.App
             var services = new ServiceCollection();
 
             var dbPath = Path.Combine(
-    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-    "FocusTracker",
-    "focus_tracker.db"
-);
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "FocusTracker",
+                "focus_tracker.db");
             Directory.CreateDirectory(Path.GetDirectoryName(dbPath));
+
             services.AddDbContext<FocusTrackerDbContext>(options =>
                 options.UseSqlite($"Data Source={dbPath}"));
 
-            // ✅ Scoped-сервіси (використовують DbContext)
             services.AddScoped<IAppUsageStatService, AppUsageStatService>();
             services.AddScoped<IRestrictionEvaluator, RestrictionEvaluator>();
             services.AddScoped<IProgramService, ProgramService>();
@@ -173,11 +227,9 @@ namespace FocusTracker.App
             services.AddScoped<IRestrictionNotificationService, RestrictionNotificationService>();
             services.AddScoped<IImpulseReminderService, ImpulseReminderService>();
 
-            // ✅ Singleton (не залежить від DbContext)
             services.AddSingleton<INotificationService, MessageBoxNotificationService>();
             services.AddSingleton<ProgramNameResolverService>();
             services.AddSingleton<ProgramSyncService>();
-
 
             Services = services.BuildServiceProvider();
         }
@@ -214,6 +266,8 @@ namespace FocusTracker.App
         protected override void OnExit(ExitEventArgs e)
         {
             _notifyIcon?.Dispose();
+            _mutex?.ReleaseMutex();
+            _mutex?.Dispose();
             base.OnExit(e);
         }
     }

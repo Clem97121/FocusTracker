@@ -9,11 +9,13 @@
         public int CountedActiveSeconds { get; set; }
         public int InitialActiveSeconds { get; set; }
 
+        public int InitialPassiveSeconds { get; set; }
+        public int CountedPassiveSeconds { get; set; } // 🆕 нове поле
+
         public DateTime? RecordedAt { get; set; }
-        public bool IsFinalized { get; set; } 
+        public bool IsFinalized { get; set; }
 
         public TaskItem Task { get; set; } = null!;
         public TrackedProgram Program { get; set; } = null!;
     }
-
 }

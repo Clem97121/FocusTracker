@@ -93,6 +93,11 @@
                                                                  Background="#333"
                                                                  Margin="0 4 0 0"
                                                                  ToolTip="{Binding XpProgressPercent, StringFormat={}{0:F1}%}" />
+                                                    <TextBlock Text="{Binding XpDisplay}" 
+                                                               FontSize="11" 
+                                                               Foreground="LightGray" 
+                                                               HorizontalAlignment="Right"
+                                                               Margin="0,2,0,0"/>
                                                 </StackPanel>
                                             </Border>
                                         </DataTemplate>

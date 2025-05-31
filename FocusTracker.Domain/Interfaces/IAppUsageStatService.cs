@@ -21,5 +21,8 @@ namespace FocusTracker.Domain.Interfaces
         // Добавленные ранее методы пересчета
         Task RecalculateAppUsageStatsForDateAsync(DateTime date);
         Task RecalculateTodayAsync();
+
+        Task<IEnumerable<AppUsageStat>> GetStatsInRangeAsync(DateTime from, DateTime to);
+
     }
 }

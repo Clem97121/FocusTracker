@@ -28,13 +28,13 @@ namespace FocusTracker.Data.Services
             if (existing != null)
             {
                 existing.CountedActiveSeconds = usage.CountedActiveSeconds;
+                existing.CountedPassiveSeconds = usage.CountedPassiveSeconds;
                 existing.InitialActiveSeconds = usage.InitialActiveSeconds;
+                existing.InitialPassiveSeconds = usage.InitialPassiveSeconds;
 
-                // ✅ Обновляем RecordedAt, если оно задано
                 if (usage.RecordedAt.HasValue)
                     existing.RecordedAt = usage.RecordedAt;
 
-                // ✅ Обновляем статус, если используется
                 existing.IsFinalized = usage.IsFinalized;
             }
             else
@@ -44,6 +44,8 @@ namespace FocusTracker.Data.Services
 
             _db.SaveChanges();
         }
+
+
 
 
         public List<TaskProgramUsage> GetAll()

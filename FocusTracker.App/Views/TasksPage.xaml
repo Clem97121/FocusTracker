@@ -65,7 +65,7 @@
                         <TextBox Text="{Binding NewTaskEstimatedMinutes}" Style="{StaticResource TextBoxStyle}"/>
 
                         <CheckBox Content="Пасивне завдання (перегляд відео, лекція)"
-                                  IsChecked="{Binding NewTaskIsPassive}"
+                                  IsChecked="{Binding NewTaskIsPassive, Mode=TwoWay}"
                                   Style="{StaticResource LeftAlignedCheckBox}"
                                   Margin="5,10,10,5"/>
 

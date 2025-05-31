@@ -195,5 +195,12 @@ namespace FocusTracker.Data.Services
         }
         public Task RecalculateTodayAsync() =>
                     RecalculateAppUsageStatsForDateAsync(DateTime.Today);
+        public async Task<IEnumerable<AppUsageStat>> GetStatsInRangeAsync(DateTime from, DateTime to)
+        {
+            return await _db.AppUsageStats
+                .Where(s => s.Date >= from && s.Date <= to)
+                .ToListAsync();
+        }
+
     }
 }

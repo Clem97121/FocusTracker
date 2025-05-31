@@ -3,6 +3,7 @@ using System;
 using FocusTracker.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FocusTracker.Data.Migrations
 {
     [DbContext(typeof(FocusTrackerDbContext))]
-    partial class FocusTrackerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250531165040_AddCountedPassiveSecondsToTaskProgramUsage")]
+    partial class AddCountedPassiveSecondsToTaskProgramUsage
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.4");
@@ -224,9 +227,6 @@ namespace FocusTracker.Data.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("InitialActiveSeconds")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("InitialPassiveSeconds")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsFinalized")
