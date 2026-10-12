@@ -19,6 +19,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.IO.Pipes;
 using FocusTracker.App.Helpers;
+using FocusTracker.App.Jarvis;
 
 namespace FocusTracker.App
 {
@@ -248,6 +249,7 @@ namespace FocusTracker.App
 
             _presence = new PresenceMonitor(userActivity, programServiceForTracker, Services.GetRequiredService<SettingsStore>());
             var presence = _presence;
+            var recentActivity = Services.GetRequiredService<RecentActivityLog>();
 
             // Щосекунди лише додаємо час у буфер у пам'яті, без звернень до БД.
             // Коли користувача немає за пристроєм, час не пишемо зовсім.
@@ -258,6 +260,7 @@ namespace FocusTracker.App
 
                     var activeTime = userActivity.GetActivePart(totalTime);
                     usageRecorder.Add(appName, totalTime, activeTime);
+                    recentActivity.Add(appName, _windowTracker.CurrentTitle, totalTime);
                 },
                 programServiceForTracker,
                 nameResolver
@@ -274,6 +277,14 @@ namespace FocusTracker.App
 
             StartUpdateChecks(mainWindow);
             Services.GetRequiredService<CloudSyncRunner>().Start(_flushCts!.Token);
+            StartJarvis();
+        }
+
+        private void StartJarvis()
+        {
+            var jarvis = Services.GetRequiredService<JarvisService>();
+            jarvis.NoteAdded += note => Dispatcher.Invoke(() => JarvisPopup.Show(note));
+            jarvis.Start(() => _presence!.IsPresent(_windowTracker.CurrentApp), _flushCts!.Token);
         }
 
         private void StartUpdateChecks(MainWindow mainWindow)
@@ -375,6 +386,10 @@ namespace FocusTracker.App
             services.AddSingleton<IAppUsageStatService, CombinedAppUsageStatService>();
             services.AddSingleton<CloudSyncService>();
             services.AddSingleton<ComputerTimeService>();
+            services.AddSingleton<RecentActivityLog>();
+            services.AddSingleton<FocusMode>();
+            services.AddSingleton<JarvisContext>();
+            services.AddSingleton<JarvisService>();
             services.AddSingleton<CloudSyncRunner>();
             services.AddSingleton<IRestrictionEvaluator, RestrictionEvaluator>();
             services.AddSingleton<IProgramService, ProgramService>();

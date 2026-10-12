@@ -101,6 +101,11 @@
         Style="{StaticResource SidebarNavButtonStyle}"
         Click="ShowProgramsPage"/>
 
+                    <Button x:Name="JarvisButton"
+                            Content="🤖" ToolTip="Джарвіс"
+        Style="{StaticResource SidebarNavButtonStyle}"
+        Click="ShowJarvisPage"/>
+
                     <Button Content="⚙" ToolTip="Налаштування"
         Style="{StaticResource SidebarNavButtonStyle}"
         Click="ShowSettingsPage"/>

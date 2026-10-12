@@ -72,6 +72,24 @@ while one of them is offline, only the later change is kept.
 The connection string is stored in `settings.json` encrypted with Windows DPAPI for the current
 user.
 
+## Jarvis
+
+A productivity assistant built on the Claude API («Налаштування» → «Джарвіс»: enable it, paste an
+Anthropic API key, write goals in priority order, productive hours and optional rules).
+
+- During productive hours, while the user is at this device, it checks every N minutes: the
+  context is the goals, rules, programs and window titles of the last hour on this device
+  (kept in memory only), today's statistics of all devices and open tasks. Claude answers with
+  a structured decision: nothing, a nudge, a question, a plan or a focus mode.
+- At the start of productive hours it proposes a plan for the day, at the end it sums the day up.
+- Messages appear in the bottom-right corner on top of other windows; «Відповісти» opens the
+  «Джарвіс» page with a chat.
+- Focus mode (if allowed) closes the listed distracting programs until it ends, through the same
+  warn-then-close mechanism as restrictions. It can be stopped on the «Джарвіс» page.
+
+The key is stored in `settings.json` encrypted with DPAPI. Requests to Opus and Sonnet models use
+server-side refusal fallbacks (`fallbacks: "default"`).
+
 ## Data
 
 Everything is stored in `%LOCALAPPDATA%\FocusTracker`:

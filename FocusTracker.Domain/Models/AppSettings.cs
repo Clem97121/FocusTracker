@@ -20,12 +20,43 @@ public class AppSettings
     // Рядок підключення до хмарної бази, зашифрований DPAPI для поточного користувача Windows
     public string? CloudConnectionProtected { get; set; }
 
+    // === Джарвіс: асистент продуктивності на базі Claude
+    public const string DefaultJarvisModel = "claude-opus-5-5";
+    public const int DefaultJarvisCheckMinutes = 20;
+
+    public bool JarvisEnabled { get; set; }
+
+    // Ключ Anthropic API, зашифрований DPAPI для поточного користувача Windows
+    public string? AnthropicKeyProtected { get; set; }
+
+    public string JarvisModel { get; set; } = DefaultJarvisModel;
+
+    // Цілі та пріоритети своїми словами — Джарвіс оцінює поведінку відносно них
+    public string Goals { get; set; } = string.Empty;
+
+    // Додаткові правила: коли нагадувати, що вважати відпочинком тощо
+    public string JarvisRules { get; set; } = string.Empty;
+
+    // Продуктивні години (за місцевим часом); перевірки йдуть лише в цей проміжок
+    public int ProductiveFromHour { get; set; } = 12;
+    public int ProductiveToHour { get; set; } = 18;
+
+    public int JarvisCheckMinutes { get; set; } = DefaultJarvisCheckMinutes;
+
+    // Чи може Джарвіс сам вмикати фокус-режим, що закриває відволікаючі програми
+    public bool JarvisMayStartFocus { get; set; } = true;
+
     public AppSettings Clone() => (AppSettings)MemberwiseClone();
 
     public AppSettings Normalized()
     {
         var copy = Clone();
         copy.IdleThresholdMinutes = Math.Clamp(IdleThresholdMinutes, MinIdleThresholdMinutes, MaxIdleThresholdMinutes);
+        copy.ProductiveFromHour = Math.Clamp(ProductiveFromHour, 0, 23);
+        copy.ProductiveToHour = Math.Clamp(ProductiveToHour, 1, 24);
+        copy.JarvisCheckMinutes = Math.Clamp(JarvisCheckMinutes, 5, 120);
+        if (string.IsNullOrWhiteSpace(copy.JarvisModel))
+            copy.JarvisModel = DefaultJarvisModel;
         if (copy.DeviceId == Guid.Empty)
             copy.DeviceId = Guid.NewGuid();
         if (string.IsNullOrWhiteSpace(copy.DeviceName))
