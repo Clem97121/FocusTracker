@@ -31,6 +31,9 @@ namespace FocusTracker.Core.Services
         // Процес, який зараз у фокусі
         public string CurrentApp => _currentApp;
 
+        // Заголовок вікна у фокусі (сайт у браузері, файл у редакторі тощо)
+        public string CurrentTitle { get; private set; } = string.Empty;
+
         // Помилки з фонового таймера (інакше вони губляться або валять процес)
         public event Action<Exception>? Error;
 
@@ -84,6 +87,7 @@ namespace FocusTracker.Core.Services
         private async Task TimerElapsedAsync()
         {
             string activeApp = GetActiveProcessName();
+            CurrentTitle = GetActiveWindowTitle();
             DateTime now = DateTime.Now;
             TimeSpan delta = now - _lastCheckTime;
             _lastCheckTime = now;
@@ -122,6 +126,12 @@ namespace FocusTracker.Core.Services
             {
                 return "Unknown";
             }
+        }
+
+        private static string GetActiveWindowTitle()
+        {
+            var title = new StringBuilder(256);
+            return GetWindowText(GetForegroundWindow(), title, title.Capacity) > 0 ? title.ToString() : string.Empty;
         }
 
         private string? GetActiveProcessPath()

@@ -108,6 +108,15 @@ namespace FocusTracker.App.Services
             var total = stats.FirstOrDefault(s => s.AppName == appName)?.TotalTime ?? TimeSpan.Zero;
 
             var violated = evaluator.TryGetViolatedRestrictions(appName, total, out var notes);
+
+            // Фокус-режим Джарвіса діє як тимчасове обмеження
+            var focus = _services.GetRequiredService<FocusMode>();
+            if (focus.Blocks(appName))
+            {
+                violated = true;
+                notes.Add($"Фокус-режим до {focus.Until:HH:mm}: {focus.Reason}");
+            }
+
             var action = _gracePeriod.Check(appName, violated, DateTime.Now);
 
             if (action == RestrictionAction.Warn)

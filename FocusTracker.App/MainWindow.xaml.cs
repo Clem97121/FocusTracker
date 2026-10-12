@@ -153,6 +153,22 @@ namespace FocusTracker.App
             }
         }
 
+        private void ShowJarvisPage(object sender, RoutedEventArgs e)
+        {
+            MainContent.Content = new JarvisPage();
+            SetPageTitle("Джарвіс");
+            HighlightNavButton((Button)sender);
+        }
+
+        // Відкрити вікно на сторінці Джарвіса (з повідомлення в кутку)
+        public void ShowJarvis()
+        {
+            Show();
+            WindowState = WindowState.Normal;
+            Activate();
+            ShowJarvisPage(JarvisButton, new RoutedEventArgs());
+        }
+
         private void ShowSettingsPage(object sender, RoutedEventArgs e)
         {
             MainContent.Content = new SettingsPage();

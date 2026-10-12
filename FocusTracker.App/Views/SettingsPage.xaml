@@ -90,6 +90,89 @@
                        TextWrapping="Wrap"
                        Margin="0 10 0 0"/>
 
+            <TextBlock Text="Джарвіс"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       Margin="0 40 0 10"/>
+
+            <TextBlock Foreground="Gray" FontSize="13" TextWrapping="Wrap" Margin="0 0 0 15"
+                       Text="Асистент продуктивності на базі Claude. У продуктивні години раз на кілька хвилин дивиться, що ви робите (програми й заголовки вікон за останню годину, статистика всіх пристроїв, задачі), порівнює з цілями й за потреби нагадує, пропонує план або вмикає фокус-режим. Ці дані надсилаються в Anthropic; заголовки вікон більше нікуди не зберігаються."/>
+
+            <CheckBox x:Name="JarvisEnabledBox"
+                      Content="Увімкнути Джарвіса"
+                      Style="{StaticResource LeftAlignedCheckBox}"
+                      Margin="0 0 0 10"/>
+
+            <TextBlock Text="Ключ Anthropic API (console.anthropic.com → API Keys)" Foreground="White" Margin="0 0 0 5"/>
+            <PasswordBox x:Name="AnthropicKeyBox"
+                         Height="30"
+                         Padding="5 0"
+                         VerticalContentAlignment="Center"
+                         Background="{StaticResource AccentBrush}"
+                         Foreground="White"
+                         BorderBrush="{StaticResource SecondAccentBrush}"
+                         Margin="0 0 0 5"/>
+            <TextBlock x:Name="AnthropicKeyHint" Foreground="Gray" FontSize="12" Margin="0 0 0 10"/>
+
+            <TextBlock Text="Модель" Foreground="White" Margin="0 0 0 5"/>
+            <ComboBox x:Name="JarvisModelBox"
+                      Width="300"
+                      HorizontalAlignment="Left"
+                      SelectedValuePath="Tag"
+                      Style="{StaticResource CustomComboBox}"
+                      Margin="0 0 0 10">
+                <ComboBoxItem Content="Claude Opus 5.5 — найрозумніша" Tag="claude-opus-5-5"/>
+                <ComboBoxItem Content="Claude Sonnet 5.5 — швидша й дешевша" Tag="claude-sonnet-5-5"/>
+                <ComboBoxItem Content="Claude Haiku 5.5 — найдешевша" Tag="claude-haiku-5-5"/>
+            </ComboBox>
+
+            <TextBlock Text="Мої цілі (за пріоритетом, своїми словами)" Foreground="White" Margin="0 0 0 5"/>
+            <TextBox x:Name="GoalsBox"
+                     Style="{StaticResource TextBoxStyle}"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     Height="110"
+                     VerticalContentAlignment="Top"
+                     VerticalScrollBarVisibility="Auto"
+                     Margin="0 0 0 10"/>
+
+            <TextBlock Text="Правила для Джарвіса (необов'язково)" Foreground="White" Margin="0 0 0 5"/>
+            <TextBox x:Name="RulesBox"
+                     Style="{StaticResource TextBoxStyle}"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     Height="80"
+                     VerticalContentAlignment="Top"
+                     VerticalScrollBarVisibility="Auto"
+                     Margin="0 0 0 10"/>
+
+            <StackPanel Orientation="Horizontal" Margin="0 0 0 10">
+                <TextBlock Text="Продуктивні години з" Foreground="White" VerticalAlignment="Center"/>
+                <TextBox x:Name="FromHourBox" Width="50" Margin="8 0" Style="{StaticResource TextBoxStyle}"/>
+                <TextBlock Text="до" Foreground="White" VerticalAlignment="Center"/>
+                <TextBox x:Name="ToHourBox" Width="50" Margin="8 0" Style="{StaticResource TextBoxStyle}"/>
+                <TextBlock Text="перевіряти кожні" Foreground="White" VerticalAlignment="Center" Margin="10 0 0 0"/>
+                <TextBox x:Name="CheckMinutesBox" Width="50" Margin="8 0" Style="{StaticResource TextBoxStyle}"/>
+                <TextBlock Text="хв" Foreground="White" VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <CheckBox x:Name="MayFocusBox"
+                      Content="Дозволити Джарвісу самому вмикати фокус-режим (закриває відволікаючі програми)"
+                      Style="{StaticResource LeftAlignedCheckBox}"
+                      Margin="0 0 0 10"/>
+
+            <StackPanel Orientation="Horizontal">
+                <Button Content="Зберегти"
+                        Width="150" Height="30"
+                        Click="SaveJarvis_Click"
+                        Style="{StaticResource AccentButtonStyle}"/>
+                <TextBlock x:Name="JarvisStatusText"
+                           Foreground="Gray"
+                           VerticalAlignment="Center"
+                           Margin="15 0 0 0"/>
+            </StackPanel>
+
             <TextBlock Text="Оновлення"
                        FontSize="18"
                        FontWeight="Bold"

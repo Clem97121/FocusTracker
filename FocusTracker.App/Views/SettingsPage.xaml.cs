@@ -36,6 +36,8 @@ namespace FocusTracker.App.Views
                 ShowAvailable(_updates.AvailableVersion);
             }
 
+            LoadJarvisSettings();
+
             _sync = App.Services.GetRequiredService<CloudSyncRunner>();
             LoadSyncSettings();
             _sync.StatusChanged += OnSyncStatusChanged;
@@ -209,5 +211,58 @@ namespace FocusTracker.App.Views
         }
 
         private void OnSyncStatusChanged() => Dispatcher.Invoke(ShowSyncStatus);
+
+        private void LoadJarvisSettings()
+        {
+            var s = _settings.Current;
+            JarvisEnabledBox.IsChecked = s.JarvisEnabled;
+            AnthropicKeyHint.Text = CloudCredentials.Unprotect(s.AnthropicKeyProtected) != null
+                ? "Ключ збережено. Залиште поле порожнім, щоб не змінювати його."
+                : "Ключ ще не задано.";
+            JarvisModelBox.SelectedValue = s.JarvisModel;
+            if (JarvisModelBox.SelectedIndex < 0) JarvisModelBox.SelectedIndex = 0;
+            GoalsBox.Text = s.Goals;
+            RulesBox.Text = s.JarvisRules;
+            FromHourBox.Text = s.ProductiveFromHour.ToString();
+            ToHourBox.Text = s.ProductiveToHour.ToString();
+            CheckMinutesBox.Text = s.JarvisCheckMinutes.ToString();
+            MayFocusBox.IsChecked = s.JarvisMayStartFocus;
+        }
+
+        private void SaveJarvis_Click(object sender, RoutedEventArgs e)
+        {
+            if (!int.TryParse(FromHourBox.Text, out var from) || !int.TryParse(ToHourBox.Text, out var to) || from >= to
+                || !int.TryParse(CheckMinutesBox.Text, out var minutes))
+            {
+                JarvisStatusText.Text = "Перевірте години (з < до) і інтервал.";
+                return;
+            }
+
+            try
+            {
+                var key = AnthropicKeyBox.Password.Trim();
+                _settings.Update(s =>
+                {
+                    s.JarvisEnabled = JarvisEnabledBox.IsChecked == true;
+                    if (key.Length > 0)
+                        s.AnthropicKeyProtected = CloudCredentials.Protect(key);
+                    s.JarvisModel = JarvisModelBox.SelectedValue as string ?? AppSettings.DefaultJarvisModel;
+                    s.Goals = GoalsBox.Text.Trim();
+                    s.JarvisRules = RulesBox.Text.Trim();
+                    s.ProductiveFromHour = from;
+                    s.ProductiveToHour = to;
+                    s.JarvisCheckMinutes = minutes;
+                    s.JarvisMayStartFocus = MayFocusBox.IsChecked == true;
+                });
+                AnthropicKeyBox.Clear();
+                LoadJarvisSettings();
+                JarvisStatusText.Text = "Збережено";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Не вдалося зберегти налаштування Джарвіса", ex);
+                JarvisStatusText.Text = "Не вдалося зберегти";
+            }
+        }
     }
 }

@@ -1,0 +1,62 @@
+<UserControl x:Class="FocusTracker.App.Views.JarvisPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+
+    <DockPanel Margin="20">
+
+        <!-- Стан і дії -->
+        <StackPanel DockPanel.Dock="Top" Margin="0 0 0 10">
+            <TextBlock x:Name="StatusText" Foreground="Gray" FontSize="13" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" Margin="0 10 0 0">
+                <Button x:Name="CheckNowButton"
+                        Content="Що мені зараз робити?"
+                        Width="220" Height="30"
+                        Click="CheckNow_Click"
+                        Style="{StaticResource AccentButtonStyle}"/>
+                <Button x:Name="StopFocusButton"
+                        Content="Завершити фокус-режим"
+                        Width="220" Height="30"
+                        Margin="10 0 0 0"
+                        Visibility="Collapsed"
+                        Click="StopFocus_Click"
+                        Style="{StaticResource AccentButtonStyle}"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Поле введення -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="0 10 0 0">
+            <Button x:Name="SendButton"
+                    DockPanel.Dock="Right"
+                    Content="Надіслати"
+                    Width="120" Height="30"
+                    Margin="10 0 0 0"
+                    Click="Send_Click"
+                    Style="{StaticResource AccentButtonStyle}"/>
+            <TextBox x:Name="InputBox"
+                     Style="{StaticResource TextBoxStyle}"
+                     KeyDown="InputBox_KeyDown"/>
+        </DockPanel>
+
+        <!-- Розмова -->
+        <ScrollViewer x:Name="ChatScroll" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="ChatItems">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="0 4"
+                                Padding="12 8"
+                                CornerRadius="10"
+                                MaxWidth="700"
+                                HorizontalAlignment="{Binding Alignment}"
+                                Background="{Binding Background}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Header}" Foreground="Gray" FontSize="11" Margin="0 0 0 3"/>
+                                <TextBlock Text="{Binding Text}" Foreground="White" FontSize="14" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>
