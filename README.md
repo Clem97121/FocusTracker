@@ -24,7 +24,8 @@ powershell -ExecutionPolicy Bypass -File scripts\install.ps1
 ```
 
 The script closes a running FocusTracker, publishes a Release build to
-`%LOCALAPPDATA%\Programs\FocusTracker` and starts it. On start the installed copy adds itself
+`%LOCALAPPDATA%\Programs\FocusTracker`, adds a FocusTracker shortcut to the Start menu and
+starts it. On start the installed copy adds itself
 to `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. Run the script again to update.
 
 ## Data

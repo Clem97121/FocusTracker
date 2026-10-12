@@ -21,5 +21,17 @@ dotnet publish $project -c Release -o $InstallDir
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish завершився з кодом $LASTEXITCODE" }
 
 $exe = Join-Path $InstallDir 'FocusTracker.App.exe'
+
+# Ярлик у меню «Пуск», щоб знаходити застосунок через пошук
+$shortcutPath = Join-Path ([Environment]::GetFolderPath('Programs')) 'FocusTracker.lnk'
+$shell = New-Object -ComObject WScript.Shell
+$shortcut = $shell.CreateShortcut($shortcutPath)
+$shortcut.TargetPath = $exe
+$shortcut.WorkingDirectory = $InstallDir
+$shortcut.IconLocation = "$exe,0"
+$shortcut.Description = 'FocusTracker'
+$shortcut.Save()
+Write-Host "Ярлик у меню «Пуск»: $shortcutPath"
+
 Write-Host "Запускаю $exe"
 Start-Process -FilePath $exe -WorkingDirectory $InstallDir
