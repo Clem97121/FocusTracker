@@ -130,6 +130,29 @@ namespace FocusTracker.App
             HighlightNavButton((Button)sender);
         }
 
+        public void ShowUpdateBanner(string version)
+        {
+            UpdateBannerText.Text = $"Доступна нова версія {version}. Застосунок перезапуститься на кілька секунд.";
+            UpdateButton.IsEnabled = true;
+            UpdateBanner.Visibility = Visibility.Visible;
+        }
+
+        private async void UpdateButton_Click(object sender, RoutedEventArgs e)
+        {
+            UpdateButton.IsEnabled = false;
+            try
+            {
+                await ((App)Application.Current).InstallUpdateAsync(
+                    percent => Dispatcher.Invoke(() => UpdateBannerText.Text = $"Завантаження оновлення… {percent}%"));
+            }
+            catch (Exception ex)
+            {
+                FocusTracker.App.Helpers.AppLog.Error("Не вдалося встановити оновлення", ex);
+                UpdateBannerText.Text = $"Не вдалося оновити: {ex.Message}";
+                UpdateButton.IsEnabled = true;
+            }
+        }
+
         private void ShowSettingsPage(object sender, RoutedEventArgs e)
         {
             MainContent.Content = new SettingsPage();
