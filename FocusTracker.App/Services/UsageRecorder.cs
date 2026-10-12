@@ -1,4 +1,5 @@
 using FocusTracker.App.Helpers;
+using FocusTracker.Domain;
 using FocusTracker.Domain.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -21,6 +22,7 @@ namespace FocusTracker.App.Services
         private readonly SemaphoreSlim _flushGate = new(1, 1);
         private Dictionary<string, (TimeSpan Total, TimeSpan Active)> _pending = new();
         private readonly Dictionary<string, DateTime> _violationCache = new();
+        private readonly RestrictionGracePeriod _gracePeriod = new();
 
         public UsageRecorder(IServiceProvider services)
         {
@@ -73,7 +75,8 @@ namespace FocusTracker.App.Services
             }
         }
 
-        // Перевіряє обмеження для програми у фокусі і закриває її, якщо ліміт порушено
+        // Перевіряє обмеження для програми у фокусі: при порушенні спершу попереджає,
+        // а закриває, лише якщо порушення триває довше за відстрочку
         public async Task EnforceRestrictionsAsync(string appName)
         {
             if (string.IsNullOrWhiteSpace(appName) || appName == "Unknown") return;
@@ -85,7 +88,19 @@ namespace FocusTracker.App.Services
             var stats = await statService.GetStatsForTodayAsync();
             var total = stats.FirstOrDefault(s => s.AppName == appName)?.TotalTime ?? TimeSpan.Zero;
 
-            if (!evaluator.TryGetViolatedRestrictions(appName, total, out var notes)) return;
+            var violated = evaluator.TryGetViolatedRestrictions(appName, total, out var notes);
+            var action = _gracePeriod.Check(appName, violated, DateTime.Now);
+
+            if (action == RestrictionAction.Warn)
+            {
+                AppLog.Info($"Попереджено про закриття {appName}: {string.Join("; ", notes)}");
+                notifier.ShowMessage(
+                    $"Ліміт для \"{appName}\" вичерпано, програму буде закрито через {_gracePeriod.Delay.TotalSeconds:0} с — збережи роботу.\n• {string.Join("\n• ", notes)}",
+                    "Обмеження перевищено");
+                return;
+            }
+
+            if (action != RestrictionAction.Close) return;
 
             var processes = Process.GetProcessesByName(appName);
             foreach (var proc in processes)
