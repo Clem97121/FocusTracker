@@ -101,6 +101,10 @@
         Style="{StaticResource SidebarNavButtonStyle}"
         Click="ShowProgramsPage"/>
 
+                    <Button Content="⚙" ToolTip="Налаштування"
+        Style="{StaticResource SidebarNavButtonStyle}"
+        Click="ShowSettingsPage"/>
+
                 </StackPanel>
 
                 <!-- ОСНОВНОЙ КОНТЕНТ -->

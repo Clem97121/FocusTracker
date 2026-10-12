@@ -10,6 +10,9 @@ namespace FocusTracker.Domain.Interfaces
         Task UpdateAsync(TrackedProgram program);
         Task AddAsync(TrackedProgram program);
 
+        // Ідентифікатори (імена процесів) програм з позначкою «не враховувати простій»
+        Task<HashSet<string>> GetIgnoreIdleIdentifiersAsync();
+
         Task UpdateDisplayNameIfNeededAsync(string identifier, string displayName);
         Task UpdateIconIfNeededAsync(string identifier, byte[] iconBytes);
 

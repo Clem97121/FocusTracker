@@ -34,6 +34,7 @@ namespace FocusTracker.App
         private Timer _impulseTimer;
         private UserActivityTracker? _userActivity;
         private UsageRecorder? _usageRecorder;
+        private PresenceMonitor? _presence;
         private CancellationTokenSource? _flushCts;
 
         private Mutex? _mutex;
@@ -232,10 +233,16 @@ namespace FocusTracker.App
             var programServiceForTracker = Services.GetRequiredService<IProgramService>();
             var nameResolver = Services.GetRequiredService<ProgramNameResolverService>();
 
-            // Щосекунди лише додаємо час у буфер у пам'яті, без звернень до БД
+            _presence = new PresenceMonitor(userActivity, programServiceForTracker, Services.GetRequiredService<SettingsStore>());
+            var presence = _presence;
+
+            // Щосекунди лише додаємо час у буфер у пам'яті, без звернень до БД.
+            // Коли користувача немає за пристроєм, час не пишемо зовсім.
             _windowTracker = new ActiveWindowTracker(
                 (appName, totalTime) =>
                 {
+                    if (!presence.IsPresent(appName)) return;
+
                     var activeTime = userActivity.GetActivePart(totalTime);
                     usageRecorder.Add(appName, totalTime, activeTime);
                 },
@@ -268,6 +275,7 @@ namespace FocusTracker.App
                     {
                         try
                         {
+                            await _presence!.RefreshIgnoreIdleAsync();
                             await _usageRecorder!.FlushAsync();
                             await _usageRecorder.EnforceRestrictionsAsync(_windowTracker.CurrentApp);
                         }
@@ -341,6 +349,7 @@ namespace FocusTracker.App
             services.AddSingleton<INotificationService, MessageBoxNotificationService>();
             services.AddSingleton<ProgramNameResolverService>();
             services.AddSingleton<ProgramSyncService>();
+            services.AddSingleton(new SettingsStore(Path.Combine(Path.GetDirectoryName(dbPath)!, "settings.json")));
 
             Services = services.BuildServiceProvider();
         }

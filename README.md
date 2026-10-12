@@ -32,6 +32,7 @@ to `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. Run the script again to
 Everything is stored in `%LOCALAPPDATA%\FocusTracker`:
 
 - `focus_tracker.db` — the SQLite database;
+- `settings.json` — settings from the «Налаштування» page (idle threshold);
 - `logs\app-yyyyMMdd.log` — application log;
 - `backups\focus_tracker-yyyyMMdd.db` — daily database backup made on start, the last 14 are kept;
 - `focus_tracker.legacy-*.db` — databases from old incompatible versions, archived on upgrade.

@@ -40,6 +40,14 @@ public class TrackedProgram : ObservableObject
         set => Set(ref _isHidden, value);
     }
 
+    // Час рахується навіть без введення (відео без звуку, дзвінки тощо)
+    private bool _ignoreIdle;
+    public bool IgnoreIdle
+    {
+        get => _ignoreIdle;
+        set => Set(ref _ignoreIdle, value);
+    }
+
     private string? _displayName;
     public string? DisplayName
     {
