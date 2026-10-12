@@ -21,9 +21,29 @@ namespace FocusTracker.Data
         public DbSet<RestrictionRule> RestrictionRules { get; set; }
         public DbSet<AppUsageStat> AppUsageStats { get; set; }
         public DbSet<HourlyAppUsageLog> HourlyAppUsageLogs { get; set; }
+        public DbSet<RemoteHourlyUsage> RemoteHourlyUsages { get; set; }
+        public DbSet<RemoteDevice> RemoteDevices { get; set; }
+        public DbSet<SyncState> SyncStates { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            // === Хмарна синхронізація
+            modelBuilder.Entity<HourlyAppUsageLog>()
+                .HasIndex(h => h.UpdatedAt);
+
+            modelBuilder.Entity<RemoteHourlyUsage>()
+                .HasIndex(r => new { r.DeviceId, r.AppName, r.Date, r.Hour })
+                .IsUnique();
+
+            modelBuilder.Entity<RemoteHourlyUsage>()
+                .HasIndex(r => r.Date);
+
+            modelBuilder.Entity<RemoteDevice>()
+                .HasKey(d => d.DeviceId);
+
+            modelBuilder.Entity<SyncState>()
+                .HasKey(s => s.Key);
+
             // === TaskProgram (связь задача <-> программа)
             modelBuilder.Entity<TaskProgram>()
                 .HasKey(tp => new { tp.TaskId, tp.ProgramId });

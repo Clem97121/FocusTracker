@@ -8,6 +8,8 @@ using FocusTracker.App.Views;
 using FocusTracker.Core.Services;
 using FocusTracker.Data;
 using FocusTracker.Data.Services;
+using FocusTracker.Data.Cloud;
+using FocusTracker.Domain;
 using FocusTracker.Domain.Interfaces;
 using FocusTracker.Domain.Models;
 using FocusTracker.App.Services;
@@ -271,6 +273,7 @@ namespace FocusTracker.App
             mainWindow.Show();
 
             StartUpdateChecks(mainWindow);
+            Services.GetRequiredService<CloudSyncRunner>().Start(_flushCts!.Token);
         }
 
         private void StartUpdateChecks(MainWindow mainWindow)
@@ -366,7 +369,12 @@ namespace FocusTracker.App
             services.AddDbContextFactory<FocusTrackerDbContext>(options =>
                 options.UseSqlite($"Data Source={dbPath};Default Timeout=30"));
 
-            services.AddSingleton<IAppUsageStatService, AppUsageStatService>();
+            // Екрани бачать статистику всіх пристроїв (за вибраним StatsScope), запис іде в локальну базу
+            services.AddSingleton<AppUsageStatService>();
+            services.AddSingleton<StatsScope>();
+            services.AddSingleton<IAppUsageStatService, CombinedAppUsageStatService>();
+            services.AddSingleton<CloudSyncService>();
+            services.AddSingleton<CloudSyncRunner>();
             services.AddSingleton<IRestrictionEvaluator, RestrictionEvaluator>();
             services.AddSingleton<IProgramService, ProgramService>();
             services.AddSingleton<ISkillService, SkillService>();

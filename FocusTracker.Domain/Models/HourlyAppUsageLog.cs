@@ -14,6 +14,9 @@ namespace FocusTracker.Domain.Models
         public int Hour { get; set; }       // Від 0 до 23
         public TimeSpan TotalTime { get; set; }
         public TimeSpan ActiveTime { get; set; }
+
+        // Коли рядок востаннє змінювався: за цим вибираємо, що відправити в хмару
+        public DateTime UpdatedAt { get; set; }
     }
 
 }

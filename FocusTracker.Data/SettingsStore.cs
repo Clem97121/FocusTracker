@@ -15,7 +15,12 @@ namespace FocusTracker.Data
         public SettingsStore(string path)
         {
             _path = path;
-            _current = Load(path);
+            var (loaded, complete) = Load(path);
+            _current = loaded;
+
+            // Ідентифікатор пристрою має бути сталим, тож одразу зберігаємо згенерований
+            if (!complete)
+                Write(loaded);
         }
 
         public AppSettings Current
@@ -28,29 +33,45 @@ namespace FocusTracker.Data
         public void Save(AppSettings settings)
         {
             var normalized = settings.Normalized();
-
-            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-            var tempPath = _path + ".tmp";
-            File.WriteAllText(tempPath, JsonSerializer.Serialize(normalized, JsonOptions));
-            File.Move(tempPath, _path, overwrite: true);
+            Write(normalized);
 
             lock (_lock) _current = normalized;
             Changed?.Invoke(normalized);
         }
 
-        // Відсутній або пошкоджений файл — значення за замовчуванням, а не падіння
-        private static AppSettings Load(string path)
+        // Змінює лише потрібні поля, решту бере з поточних налаштувань
+        public void Update(Action<AppSettings> change)
+        {
+            var copy = Current.Clone();
+            change(copy);
+            Save(copy);
+        }
+
+        private void Write(AppSettings settings)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+            var tempPath = _path + ".tmp";
+            File.WriteAllText(tempPath, JsonSerializer.Serialize(settings, JsonOptions));
+            File.Move(tempPath, _path, overwrite: true);
+        }
+
+        // Відсутній або пошкоджений файл — значення за замовчуванням, а не падіння.
+        // complete = false, якщо файлу не було або в ньому бракувало ідентифікатора пристрою.
+        private static (AppSettings Settings, bool Complete) Load(string path)
         {
             try
             {
                 if (File.Exists(path))
-                    return (JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? new AppSettings()).Normalized();
+                {
+                    var loaded = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? new AppSettings();
+                    return (loaded.Normalized(), loaded.DeviceId != Guid.Empty);
+                }
             }
             catch (JsonException)
             {
             }
 
-            return new AppSettings();
+            return (new AppSettings().Normalized(), false);
         }
     }
 }

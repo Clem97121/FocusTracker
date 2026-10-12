@@ -1,6 +1,7 @@
 using FocusTracker.App.Helpers;
 using FocusTracker.App.Services;
 using FocusTracker.Data;
+using FocusTracker.Data.Cloud;
 using FocusTracker.Domain.Models;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -34,7 +35,14 @@ namespace FocusTracker.App.Views
             {
                 ShowAvailable(_updates.AvailableVersion);
             }
+
+            _sync = App.Services.GetRequiredService<CloudSyncRunner>();
+            LoadSyncSettings();
+            _sync.StatusChanged += OnSyncStatusChanged;
+            Unloaded += (_, _) => _sync.StatusChanged -= OnSyncStatusChanged;
         }
+
+        private readonly CloudSyncRunner _sync;
 
         private readonly UpdateService _updates;
 
@@ -95,7 +103,7 @@ namespace FocusTracker.App.Views
         {
             try
             {
-                _settings.Save(new AppSettings { IdleThresholdMinutes = (int)IdleSlider.Value });
+                _settings.Update(s => s.IdleThresholdMinutes = (int)IdleSlider.Value);
                 SavedText.Text = "Збережено";
             }
             catch (Exception ex)
@@ -105,5 +113,101 @@ namespace FocusTracker.App.Views
             }
             SavedText.Visibility = Visibility.Visible;
         }
+
+        private void LoadSyncSettings()
+        {
+            var current = _settings.Current;
+            DeviceNameBox.Text = current.DeviceName;
+            SyncEnabledBox.IsChecked = current.CloudSyncEnabled;
+            ConnectionHint.Text = CloudCredentials.Unprotect(current.CloudConnectionProtected) != null
+                ? "Рядок підключення збережено. Залиште поле порожнім, щоб не змінювати його."
+                : "Рядок підключення ще не задано.";
+            ShowSyncStatus();
+        }
+
+        private void ShowSyncStatus()
+        {
+            if (!_sync.IsConfigured)
+            {
+                SyncStatusText.Text = "Синхронізацію вимкнено.";
+                return;
+            }
+
+            if (_sync.LastError != null)
+                SyncStatusText.Text = $"Помилка синхронізації: {_sync.LastError}";
+            else if (_sync.LastSuccessAt is { } at && _sync.LastResult is { } result)
+                SyncStatusText.Text = $"Остання синхронізація: {at:HH:mm:ss}. Відправлено рядків: {result.Uploaded}, отримано: {result.Downloaded}.";
+            else
+                SyncStatusText.Text = "Очікую першої синхронізації…";
+        }
+
+        // Введений рядок підключення, а якщо поле порожнє — збережений
+        private string? GetConnectionString() =>
+            string.IsNullOrWhiteSpace(ConnectionBox.Password)
+                ? CloudCredentials.Unprotect(_settings.Current.CloudConnectionProtected)
+                : ConnectionBox.Password.Trim();
+
+        private async void SaveSync_Click(object sender, RoutedEventArgs e)
+        {
+            SaveSyncButton.IsEnabled = false;
+            try
+            {
+                var newConnection = ConnectionBox.Password.Trim();
+                var oldConnection = CloudCredentials.Unprotect(_settings.Current.CloudConnectionProtected);
+
+                // Інша база — інші дані: відправимо все заново й заберемо чужі рядки з нової бази
+                if (newConnection.Length > 0 && newConnection != oldConnection)
+                    await App.Services.GetRequiredService<CloudSyncService>().ResetAsync();
+
+                _settings.Update(s =>
+                {
+                    s.DeviceName = DeviceNameBox.Text;
+                    s.CloudSyncEnabled = SyncEnabledBox.IsChecked == true;
+                    if (newConnection.Length > 0)
+                        s.CloudConnectionProtected = CloudCredentials.Protect(newConnection);
+                });
+
+                ConnectionBox.Clear();
+                LoadSyncSettings();
+
+                if (_sync.IsConfigured)
+                {
+                    SyncStatusText.Text = "Синхронізую…";
+                    await _sync.SyncNowAsync();
+                }
+                ShowSyncStatus();
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Не вдалося зберегти налаштування синхронізації", ex);
+                SyncStatusText.Text = $"Не вдалося зберегти: {ex.Message}";
+            }
+            SaveSyncButton.IsEnabled = true;
+        }
+
+        private async void TestConnection_Click(object sender, RoutedEventArgs e)
+        {
+            var connection = GetConnectionString();
+            if (connection == null)
+            {
+                SyncStatusText.Text = "Спершу вставте рядок підключення.";
+                return;
+            }
+
+            TestConnectionButton.IsEnabled = false;
+            SyncStatusText.Text = "Перевіряю підключення…";
+            try
+            {
+                await CloudSyncService.TestConnectionAsync(new CloudStore(connection));
+                SyncStatusText.Text = "Підключення працює.";
+            }
+            catch (Exception ex)
+            {
+                SyncStatusText.Text = $"Не вдалося підключитися: {ex.Message}";
+            }
+            TestConnectionButton.IsEnabled = true;
+        }
+
+        private void OnSyncStatusChanged() => Dispatcher.Invoke(ShowSyncStatus);
     }
 }

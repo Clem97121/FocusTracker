@@ -86,9 +86,67 @@ namespace FocusTracker.Data.Migrations
                     b.Property<TimeSpan>("TotalTime")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("UpdatedAt");
+
                     b.ToTable("HourlyAppUsageLogs");
+                });
+
+            modelBuilder.Entity("FocusTracker.Domain.Models.RemoteDevice", b =>
+                {
+                    b.Property<Guid>("DeviceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("LastSeenAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("DeviceId");
+
+                    b.ToTable("RemoteDevices");
+                });
+
+            modelBuilder.Entity("FocusTracker.Domain.Models.RemoteHourlyUsage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<TimeSpan>("ActiveTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AppName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Hour")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<TimeSpan>("TotalTime")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date");
+
+                    b.HasIndex("DeviceId", "AppName", "Date", "Hour")
+                        .IsUnique();
+
+                    b.ToTable("RemoteHourlyUsages");
                 });
 
             modelBuilder.Entity("FocusTracker.Domain.Models.Restriction", b =>
@@ -194,6 +252,20 @@ namespace FocusTracker.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("SkillCategories");
+                });
+
+            modelBuilder.Entity("FocusTracker.Domain.Models.SyncState", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("SyncStates");
                 });
 
             modelBuilder.Entity("FocusTracker.Domain.Models.TaskProgram", b =>

@@ -43,6 +43,25 @@ git push origin v1.0.0
 The `release` workflow runs the tests, packs the app with [Velopack](https://velopack.io)
 and publishes the GitHub release. Installed copies pick it up on their next check.
 
+## Sync between devices
+
+Usage statistics of all devices can be shared through a Supabase (Postgres) database:
+
+1. Create a Supabase project. In the project press **Connect** and copy the **Session pooler**
+   connection string in the .NET format (the direct connection is IPv6-only).
+2. In FocusTracker open «Налаштування» → «Синхронізація між пристроями», set the device name,
+   paste the connection string, tick «Синхронізувати» and press «Зберегти».
+
+On the first sync the app creates the `ft_devices` and `ft_hourly_usage` tables (Row Level
+Security enabled, so they are not exposed through the Supabase Data API). Every minute it
+uploads hourly rows changed on this device and downloads rows of the other devices into the
+local `RemoteHourlyUsages` table, so statistics also work offline. The statistics page gets a
+device selector; daily limits count the time of all devices. Tasks, skills, restrictions and
+program categories stay per device.
+
+The connection string is stored in `settings.json` encrypted with Windows DPAPI for the current
+user.
+
 ## Data
 
 Everything is stored in `%LOCALAPPDATA%\FocusTracker`:
