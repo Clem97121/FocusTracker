@@ -38,6 +38,7 @@ namespace FocusTracker.App
         private CancellationTokenSource? _flushCts;
 
         private Mutex? _mutex;
+        private bool _ownsMutex;
         private string _dbPath = "";
 
         [DllImport("user32.dll")]
@@ -87,9 +88,18 @@ namespace FocusTracker.App
         [DllImport("user32.dll", SetLastError = true)]
         private static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
 
+        private const string StartupValueName = "FocusTracker";
+
+        // Викликається Velopack перед видаленням застосунку
+        public static void RemoveFromStartup()
+        {
+            using RegistryKey? key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
+            key?.DeleteValue(StartupValueName, throwOnMissingValue: false);
+        }
+
         private void AddToStartup()
         {
-            string appName = "FocusTracker";
+            string appName = StartupValueName;
             // Assembly.Location у .NET 8 вказує на .dll, а запускати треба .exe
             string? exePath = Environment.ProcessPath;
             if (string.IsNullOrEmpty(exePath)) return;
@@ -110,6 +120,7 @@ namespace FocusTracker.App
             const string mutexName = "FocusTrackerAppSingleton";
             bool createdNew;
             _mutex = new Mutex(true, mutexName, out createdNew);
+            _ownsMutex = createdNew;
 
             if (!createdNew)
             {
@@ -258,6 +269,29 @@ namespace FocusTracker.App
             var mainWindow = new MainWindow();
             MainWindow = mainWindow;
             mainWindow.Show();
+
+            StartUpdateChecks(mainWindow);
+        }
+
+        private void StartUpdateChecks(MainWindow mainWindow)
+        {
+            var updates = Services.GetRequiredService<UpdateService>();
+            updates.UpdateAvailable += version => Dispatcher.Invoke(() =>
+            {
+                mainWindow.ShowUpdateBanner(version);
+                _notifyIcon.ShowBalloonTip(10000, "FocusTracker",
+                    $"Доступна нова версія {version}. Відкрийте застосунок, щоб оновити.",
+                    System.Windows.Forms.ToolTipIcon.Info);
+            });
+            updates.StartPeriodicChecks(_flushCts!.Token);
+        }
+
+        // Завантажує оновлення і закриває застосунок; Velopack встановить нову версію і запустить її
+        public async Task InstallUpdateAsync(Action<int>? progress = null)
+        {
+            await Services.GetRequiredService<UpdateService>().DownloadAndPrepareRestartAsync(progress);
+            _exitRequested = true;
+            Current.MainWindow.Close();
         }
 
         // Раз на кілька секунд записуємо накопичений час у БД і перевіряємо обмеження
@@ -349,6 +383,7 @@ namespace FocusTracker.App
             services.AddSingleton<INotificationService, MessageBoxNotificationService>();
             services.AddSingleton<ProgramNameResolverService>();
             services.AddSingleton<ProgramSyncService>();
+            services.AddSingleton<UpdateService>();
             services.AddSingleton(new SettingsStore(Path.Combine(Path.GetDirectoryName(dbPath)!, "settings.json")));
 
             Services = services.BuildServiceProvider();
@@ -382,6 +417,13 @@ namespace FocusTracker.App
                 Current.MainWindow.Show();
                 Current.MainWindow.WindowState = WindowState.Normal;
             };
+
+            _notifyIcon.BalloonTipClicked += (s, e) =>
+            {
+                Current.MainWindow.Show();
+                Current.MainWindow.WindowState = WindowState.Normal;
+                Current.MainWindow.Activate();
+            };
         }
 
         protected override void OnExit(ExitEventArgs e)
@@ -405,7 +447,9 @@ namespace FocusTracker.App
             }
 
             _notifyIcon?.Dispose();
-            _mutex?.ReleaseMutex();
+            // Друга копія м'ютексом не володіє, і ReleaseMutex у ній кидав виняток
+            if (_ownsMutex)
+                _mutex?.ReleaseMutex();
             _mutex?.Dispose();
             base.OnExit(e);
         }

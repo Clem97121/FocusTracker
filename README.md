@@ -17,16 +17,31 @@ Debug builds never register themselves for autostart, so running the app from th
 does not affect the installed copy. Only one copy runs at a time, so close the installed
 one (tray icon → «Вийти») before starting a Debug build.
 
-## Install
+## Install and update
+
+Download `FocusTrackerApp-win-Setup.exe` from the latest
+[GitHub release](https://github.com/Clem97121/FocusTracker/releases/latest) and run it.
+The exe is not signed, so on first run Windows SmartScreen asks to confirm
+(«Докладніше» → «Однаково запустити»). Setup installs the .NET 8 Desktop Runtime if it is
+missing, installs the app to `%LOCALAPPDATA%\FocusTrackerApp`, adds Start menu and desktop
+shortcuts and starts it. On start the app adds itself to
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`; uninstalling removes that entry.
+
+The installed app checks GitHub Releases 30 s after start and then every 6 hours. When a new
+version is found it shows a banner with an «Оновити» button and a tray notification; the
+update can also be checked manually on the «Налаштування» page.
+
+## Release
+
+Push a tag `vX.Y.Z` on `main`:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\install.ps1
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
-The script closes a running FocusTracker, publishes a Release build to
-`%LOCALAPPDATA%\Programs\FocusTracker`, adds a FocusTracker shortcut to the Start menu and
-starts it. On start the installed copy adds itself
-to `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. Run the script again to update.
+The `release` workflow runs the tests, packs the app with [Velopack](https://velopack.io)
+and publishes the GitHub release. Installed copies pick it up on their next check.
 
 ## Data
 

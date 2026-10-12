@@ -1,0 +1,62 @@
+name: release
+
+# Реліз за тегом vX.Y.Z: збірка, пакування Velopack і публікація в GitHub Releases.
+# Встановлені копії знаходять нову версію там і оновлюються самі.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      REPO_URL: https://github.com/${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Version from tag
+        shell: pwsh
+        run: |
+          $version = $env:TAG.TrimStart('v')
+          "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Test
+        run: dotnet test FocusTracker.Tests -c Release
+
+      - name: Publish
+        shell: pwsh
+        run: dotnet publish FocusTracker.App/FocusTracker.App.csproj -c Release -r win-x64 --self-contained false -o publish -p:Version=$env:VERSION
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk --version 1.2.158
+
+      # Попередній реліз потрібен для дельта-оновлень; для першого релізу його немає
+      - name: Download previous release
+        continue-on-error: true
+        shell: pwsh
+        run: vpk download github --repoUrl $env:REPO_URL --token $env:GH_TOKEN
+
+      - name: Pack
+        shell: pwsh
+        run: >
+          vpk pack
+          --packId FocusTrackerApp
+          --packVersion $env:VERSION
+          --packDir publish
+          --mainExe FocusTracker.App.exe
+          --packTitle FocusTracker
+          --icon FocusTracker.App/icon.ico
+          --framework net8.0-x64-desktop
+
+      - name: Upload
+        shell: pwsh
+        run: vpk upload github --repoUrl $env:REPO_URL --publish --releaseName "FocusTracker $env:VERSION" --tag $env:TAG --token $env:GH_TOKEN
