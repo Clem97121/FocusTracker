@@ -283,15 +283,10 @@ namespace FocusTracker.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("TaskItemId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<TimeSpan?>("TotalUsageTime")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("TaskItemId");
 
                     b.ToTable("TrackedPrograms");
                 });
@@ -431,13 +426,6 @@ namespace FocusTracker.Data.Migrations
                     b.Navigation("Task");
                 });
 
-            modelBuilder.Entity("FocusTracker.Domain.Models.TrackedProgram", b =>
-                {
-                    b.HasOne("TaskItem", null)
-                        .WithMany("Programs")
-                        .HasForeignKey("TaskItemId");
-                });
-
             modelBuilder.Entity("TaskItem", b =>
                 {
                     b.HasOne("FocusTracker.Domain.Models.Skill", "Skill")
@@ -459,11 +447,6 @@ namespace FocusTracker.Data.Migrations
             modelBuilder.Entity("FocusTracker.Domain.Models.Skill", b =>
                 {
                     b.Navigation("Tasks");
-                });
-
-            modelBuilder.Entity("TaskItem", b =>
-                {
-                    b.Navigation("Programs");
                 });
 #pragma warning restore 612, 618
         }

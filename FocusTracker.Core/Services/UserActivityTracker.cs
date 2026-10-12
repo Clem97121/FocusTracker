@@ -9,6 +9,7 @@ namespace FocusTracker.Core.Services
         private readonly System.Timers.Timer _checkTimer;
         private DateTime _lastInputTime;
         private TimeSpan _activeTime;
+        private readonly object _lock = new();
         private IKeyboardMouseEvents _events;
 
         public event Action<TimeSpan> OnActiveTimeUpdated;
@@ -47,16 +48,24 @@ namespace FocusTracker.Core.Services
         {
             if ((DateTime.Now - _lastInputTime).TotalSeconds < 5)
             {
-                _activeTime += TimeSpan.FromSeconds(5);
-                OnActiveTimeUpdated?.Invoke(_activeTime);
+                TimeSpan current;
+                lock (_lock)
+                {
+                    _activeTime += TimeSpan.FromSeconds(5);
+                    current = _activeTime;
+                }
+                OnActiveTimeUpdated?.Invoke(current);
             }
         }
 
         public TimeSpan GetAndResetActiveTime()
         {
-            var result = _activeTime;
-            _activeTime = TimeSpan.Zero;
-            return result;
+            lock (_lock)
+            {
+                var result = _activeTime;
+                _activeTime = TimeSpan.Zero;
+                return result;
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using FocusTracker.Data;
 using FocusTracker.Domain.Interfaces;
 using FocusTracker.Domain.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.ObjectModel;
@@ -170,7 +171,8 @@ namespace FocusTracker.App.ViewModels
             };
 
             var savedTask = _taskService.Add(task);
-            var todayStats = _appUsageStatService.GetStatsForTodayAsync().Result;
+            // Task.Run: .Result на UI-потоці без нього може зависнути
+            var todayStats = Task.Run(() => _appUsageStatService.GetStatsForTodayAsync()).GetAwaiter().GetResult();
 
             foreach (var program in SelectedPrograms)
             {
@@ -367,7 +369,7 @@ namespace FocusTracker.App.ViewModels
                 task.ActiveSeconds = finalSeconds;
                 _taskService.Update(task);
 
-                var db = App.Services.GetRequiredService<FocusTrackerDbContext>();
+                using var db = App.Services.GetRequiredService<IDbContextFactory<FocusTrackerDbContext>>().CreateDbContext();
                 db.ExperienceHistories.Add(new ExperienceHistory
                 {
                     TaskId = task.Id,

@@ -10,25 +10,26 @@ namespace FocusTracker.Data.Services
 {
     public class AppUsageStatService : IAppUsageStatService
     {
-        private readonly FocusTrackerDbContext _db;
+        private readonly IDbContextFactory<FocusTrackerDbContext> _dbFactory;
 
-        public AppUsageStatService(FocusTrackerDbContext db)
+        public AppUsageStatService(IDbContextFactory<FocusTrackerDbContext> dbFactory)
         {
-            _db = db;
+            _dbFactory = dbFactory;
         }
         public async Task AddOrUpdateUsageAsync(string appName, TimeSpan totalTime, TimeSpan activeTime)
         {
+            await using var db = await _dbFactory.CreateDbContextAsync();
             var today = DateTime.Today;
             var now = DateTime.Now;
             var hour = now.Hour;
 
-            var hourly = await _db.HourlyAppUsageLogs
+            var hourly = await db.HourlyAppUsageLogs
                 .FirstOrDefaultAsync(h => h.AppName == appName && h.Date == today && h.Hour == hour);
 
-            var stat = await _db.AppUsageStats
+            var stat = await db.AppUsageStats
                 .FirstOrDefaultAsync(s => s.AppName == appName && s.Date == today);
 
-            var tracked = await _db.TrackedPrograms
+            var tracked = await db.TrackedPrograms
                 .FirstOrDefaultAsync(p => p.Identifier == appName);
 
             if (tracked == null)
@@ -41,7 +42,7 @@ namespace FocusTracker.Data.Services
                     IsTracked = true,
                     IsHidden = false
                 };
-                _db.TrackedPrograms.Add(tracked);
+                db.TrackedPrograms.Add(tracked);
             }
 
             if (hourly == null)
@@ -54,7 +55,7 @@ namespace FocusTracker.Data.Services
                     TotalTime = totalTime,
                     ActiveTime = activeTime
                 };
-                _db.HourlyAppUsageLogs.Add(hourly);
+                db.HourlyAppUsageLogs.Add(hourly);
             }
             else
             {
@@ -71,34 +72,37 @@ namespace FocusTracker.Data.Services
                     TotalTime = totalTime,
                     ActiveTime = activeTime
                 };
-                _db.AppUsageStats.Add(stat);
+                db.AppUsageStats.Add(stat);
             }
             else
             {
                 stat.TotalTime += totalTime;
                 stat.ActiveTime += activeTime;
-                _db.AppUsageStats.Update(stat);
+                db.AppUsageStats.Update(stat);
             }
 
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
         }
         public async Task<List<AppUsageStat>> GetStatsForTodayAsync()
         {
-            return await _db.AppUsageStats
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            return await db.AppUsageStats
                 .Where(s => s.Date == DateTime.Today)
                 .AsNoTracking()
                 .ToListAsync();
         }
         public async Task<List<AppUsageStat>> GetStatsForDayAsync(DateTime date)
         {
-            return await _db.AppUsageStats
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            return await db.AppUsageStats
                 .Where(s => s.Date == date)
                 .AsNoTracking()
                 .ToListAsync();
         }
         public async Task<List<HourlyAppUsageLog>> GetHourlyStatsAsync(DateTime date)
         {
-            return await _db.HourlyAppUsageLogs
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            return await db.HourlyAppUsageLogs
                 .Where(h => h.Date == date)
                 .AsNoTracking()
                 .ToListAsync();
@@ -113,12 +117,13 @@ namespace FocusTracker.Data.Services
         }
         private async Task<IEnumerable<HourlyCategoryStat>> GetHourlyCategoryStatsForDateInternalAsync(DateTime date)
         {
+            await using var db = await _dbFactory.CreateDbContextAsync();
             // Загрузка данных в память
-            var usageLogs = await _db.HourlyAppUsageLogs
+            var usageLogs = await db.HourlyAppUsageLogs
                 .Where(log => log.Date == date)
                 .ToListAsync();
 
-            var programCategories = await _db.TrackedPrograms
+            var programCategories = await db.TrackedPrograms
                 .ToDictionaryAsync(p => p.Identifier, p => p.Category);
 
             var grouped = usageLogs
@@ -158,13 +163,15 @@ namespace FocusTracker.Data.Services
         }
         public async Task<DateTime> GetMinTrackedDateAsync()
         {
-            var first = await _db.AppUsageStats.OrderBy(s => s.Date).FirstOrDefaultAsync();
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            var first = await db.AppUsageStats.OrderBy(s => s.Date).FirstOrDefaultAsync();
             return first?.Date ?? DateTime.Today;
         }
         public async Task RecalculateAppUsageStatsForDateAsync(DateTime date)
         {
+            await using var db = await _dbFactory.CreateDbContextAsync();
             // Загружаем все почасовые логи за выбранную дату
-            var hourlyLogs = await _db.HourlyAppUsageLogs
+            var hourlyLogs = await db.HourlyAppUsageLogs
                 .Where(log => log.Date == date)
                 .ToListAsync();
 
@@ -184,20 +191,21 @@ namespace FocusTracker.Data.Services
                 .ToList();
 
             // Удаляем старые дневные записи за эту дату
-            var oldStats = await _db.AppUsageStats
+            var oldStats = await db.AppUsageStats
                 .Where(s => s.Date == date)
                 .ToListAsync();
 
-            _db.AppUsageStats.RemoveRange(oldStats);
-            _db.AppUsageStats.AddRange(grouped);
+            db.AppUsageStats.RemoveRange(oldStats);
+            db.AppUsageStats.AddRange(grouped);
 
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
         }
         public Task RecalculateTodayAsync() =>
                     RecalculateAppUsageStatsForDateAsync(DateTime.Today);
         public async Task<IEnumerable<AppUsageStat>> GetStatsInRangeAsync(DateTime from, DateTime to)
         {
-            return await _db.AppUsageStats
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            return await db.AppUsageStats
                 .Where(s => s.Date >= from && s.Date <= to)
                 .ToListAsync();
         }
