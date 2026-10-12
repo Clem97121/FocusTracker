@@ -66,13 +66,22 @@ namespace FocusTracker.Data.Cloud
             );
             create index if not exists ft_entities_synced_at on public.ft_entities (synced_at);
             alter table public.ft_entities enable row level security;
+            create table if not exists public.ft_activity (
+                device_id uuid not null references public.ft_devices(device_id) on delete cascade,
+                date date not null,
+                minutes bytea not null,
+                updated_at timestamptz not null default now(),
+                primary key (device_id, date)
+            );
+            create index if not exists ft_activity_updated_at on public.ft_activity (updated_at);
+            alter table public.ft_activity enable row level security;
             alter table public.ft_devices enable row level security;
             alter table public.ft_hourly_usage enable row level security;
             alter table public.ft_programs enable row level security;
             """;
 
         // Змінюється, коли SchemaSql отримує нові таблиці: пристрої перевіряють схему заново
-        public const int SchemaVersion = 3;
+        public const int SchemaVersion = 4;
 
         private readonly string _connectionString;
 
@@ -278,6 +287,42 @@ namespace FocusTracker.Data.Cloud
                     reader.GetDateTime(4),
                     reader.GetGuid(5)), reader.GetDateTime(6)));
             }
+            return rows;
+        }
+
+        // Хвилини присутності за день; бітова карта перезаписується повністю
+        public async Task UploadActivityAsync(Guid deviceId, IReadOnlyList<(DateOnly Date, byte[] Minutes)> days, CancellationToken token = default)
+        {
+            if (days.Count == 0) return;
+
+            await using var connection = await OpenAsync(token);
+            await using var command = new NpgsqlCommand("""
+                insert into public.ft_activity (device_id, date, minutes, updated_at)
+                select @device, u.date, u.minutes, now() from unnest(@dates, @minutes) as u(date, minutes)
+                on conflict (device_id, date) do update set minutes = excluded.minutes, updated_at = now();
+                """, connection);
+            command.Parameters.AddWithValue("device", deviceId);
+            command.Parameters.Add(new NpgsqlParameter("dates", NpgsqlDbType.Array | NpgsqlDbType.Date) { Value = days.Select(d => d.Date).ToArray() });
+            command.Parameters.Add(new NpgsqlParameter("minutes", NpgsqlDbType.Array | NpgsqlDbType.Bytea) { Value = days.Select(d => d.Minutes).ToArray() });
+            await command.ExecuteNonQueryAsync(token);
+        }
+
+        public async Task<List<(Guid DeviceId, DateOnly Date, byte[] Minutes, DateTime UpdatedAtUtc)>> DownloadActivityAsync(
+            Guid excludeDeviceId, DateTime? sinceUtc, CancellationToken token = default)
+        {
+            await using var connection = await OpenAsync(token);
+            await using var command = new NpgsqlCommand("""
+                select device_id, date, minutes, updated_at from public.ft_activity
+                where device_id <> @me and (@since::timestamptz is null or updated_at > @since)
+                order by updated_at;
+                """, connection);
+            command.Parameters.AddWithValue("me", excludeDeviceId);
+            command.Parameters.Add(new NpgsqlParameter("since", NpgsqlDbType.TimestampTz) { Value = (object?)sinceUtc ?? DBNull.Value });
+
+            var rows = new List<(Guid, DateOnly, byte[], DateTime)>();
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+                rows.Add((reader.GetGuid(0), reader.GetFieldValue<DateOnly>(1), reader.GetFieldValue<byte[]>(2), reader.GetDateTime(3)));
             return rows;
         }
 

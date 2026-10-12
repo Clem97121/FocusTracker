@@ -60,6 +60,8 @@ not exposed through the Supabase Data API). Every minute it:
   page gets a device selector; daily limits count the time of all devices;
 - syncs program settings (category, tracked, hidden, ignore idle) in `ft_programs` and program
   icons in `ft_program_icons`;
+- syncs the minutes the user was at each device (`ft_activity`, a 1440-bit map per day), so
+  «Час за комп'ютером» on the statistics page counts simultaneous work on several devices once;
 - syncs skill categories, skills, tasks (with their programs), restrictions and XP history as
   JSON documents in `ft_entities`, including deletions.
 

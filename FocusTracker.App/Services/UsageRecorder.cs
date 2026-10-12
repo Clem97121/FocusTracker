@@ -1,4 +1,5 @@
 using FocusTracker.App.Helpers;
+using FocusTracker.Data.Services;
 using FocusTracker.Domain;
 using FocusTracker.Domain.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,7 @@ namespace FocusTracker.App.Services
         private readonly object _lock = new();
         private readonly SemaphoreSlim _flushGate = new(1, 1);
         private Dictionary<string, (TimeSpan Total, TimeSpan Active)> _pending = new();
+        private HashSet<DateTime> _pendingMinutes = new();
         private readonly Dictionary<string, DateTime> _violationCache = new();
         private readonly RestrictionGracePeriod _gracePeriod = new();
 
@@ -37,6 +39,10 @@ namespace FocusTracker.App.Services
             {
                 _pending.TryGetValue(appName, out var current);
                 _pending[appName] = (current.Total + total, current.Active + active);
+
+                // Хвилина, коли користувач був за пристроєм, — для «часу за комп'ютером»
+                var now = DateTime.Now;
+                _pendingMinutes.Add(new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0));
             }
         }
 
@@ -47,11 +53,24 @@ namespace FocusTracker.App.Services
             try
             {
                 Dictionary<string, (TimeSpan Total, TimeSpan Active)> batch;
+                HashSet<DateTime> minutes;
                 lock (_lock)
                 {
                     if (_pending.Count == 0) return;
                     batch = _pending;
                     _pending = new();
+                    minutes = _pendingMinutes;
+                    _pendingMinutes = new();
+                }
+
+                try
+                {
+                    await _services.GetRequiredService<ComputerTimeService>().AddMinutesAsync(minutes);
+                }
+                catch (Exception ex)
+                {
+                    lock (_lock) _pendingMinutes.UnionWith(minutes);
+                    AppLog.Error("Не вдалося записати хвилини присутності", ex);
                 }
 
                 var statService = _services.GetRequiredService<IAppUsageStatService>();
