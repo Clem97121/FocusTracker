@@ -374,6 +374,7 @@ namespace FocusTracker.App
             services.AddSingleton<StatsScope>();
             services.AddSingleton<IAppUsageStatService, CombinedAppUsageStatService>();
             services.AddSingleton<CloudSyncService>();
+            services.AddSingleton<ComputerTimeService>();
             services.AddSingleton<CloudSyncRunner>();
             services.AddSingleton<IRestrictionEvaluator, RestrictionEvaluator>();
             services.AddSingleton<IProgramService, ProgramService>();

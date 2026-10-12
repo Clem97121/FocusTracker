@@ -25,6 +25,12 @@
                       Style="{StaticResource CustomComboBox}"
                       Visibility="{Binding HasRemoteDevices, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
+            <TextBlock Text="{Binding ComputerTimeText}"
+                       FontSize="16"
+                       Foreground="White"
+                       Margin="0 0 0 10"
+                       ToolTip="Хвилини, коли ви були хоча б за одним пристроєм. Одночасна робота на кількох пристроях рахується один раз."/>
+
             <!-- Тумблер -->
             <StackPanel Orientation="Horizontal" Margin="0 0 0 10" VerticalAlignment="Center">
                 <TextBlock Text="Один день"

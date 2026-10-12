@@ -25,6 +25,8 @@ namespace FocusTracker.Data
         public DbSet<RemoteDevice> RemoteDevices { get; set; }
         public DbSet<SyncState> SyncStates { get; set; }
         public DbSet<SyncTombstone> SyncTombstones { get; set; }
+        public DbSet<ActivityDay> ActivityDays { get; set; }
+        public DbSet<RemoteActivityDay> RemoteActivityDays { get; set; }
 
         // Увімкнено, коли застосовуються зміни з інших пристроїв: тоді їх не позначаємо як власні
         public bool SuppressSyncTracking { get; set; }
@@ -121,6 +123,13 @@ namespace FocusTracker.Data
 
             modelBuilder.Entity<SyncState>()
                 .HasKey(s => s.Key);
+
+            modelBuilder.Entity<ActivityDay>()
+                .HasKey(a => a.Date);
+
+            modelBuilder.Entity<RemoteActivityDay>()
+                .HasIndex(a => new { a.DeviceId, a.Date })
+                .IsUnique();
 
             // === TaskProgram (связь задача <-> программа)
             modelBuilder.Entity<TaskProgram>()

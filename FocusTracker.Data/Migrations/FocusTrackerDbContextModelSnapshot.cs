@@ -41,6 +41,23 @@ namespace FocusTracker.Data.Migrations
                     b.ToTable("AppUsageStats");
                 });
 
+            modelBuilder.Entity("FocusTracker.Domain.Models.ActivityDay", b =>
+                {
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("Minutes")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Date");
+
+                    b.ToTable("ActivityDays");
+                });
+
             modelBuilder.Entity("FocusTracker.Domain.Models.ExperienceHistory", b =>
                 {
                     b.Property<int>("Id")
@@ -100,6 +117,30 @@ namespace FocusTracker.Data.Migrations
                     b.HasIndex("UpdatedAt");
 
                     b.ToTable("HourlyAppUsageLogs");
+                });
+
+            modelBuilder.Entity("FocusTracker.Domain.Models.RemoteActivityDay", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("Minutes")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("RemoteActivityDays");
                 });
 
             modelBuilder.Entity("FocusTracker.Domain.Models.RemoteDevice", b =>

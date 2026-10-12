@@ -45,6 +45,8 @@ namespace FocusTracker.Data.Cloud
                 await SyncIconsAsync(cloud, token);
                 uploaded += await UploadEntitiesAsync(cloud, deviceId, token);
                 downloaded += await DownloadEntitiesAsync(cloud, deviceId, token);
+                uploaded += await UploadActivityAsync(cloud, deviceId, token);
+                downloaded += await DownloadActivityAsync(cloud, deviceId, token);
                 await RefreshDevicesAsync(cloud, deviceId, token);
 
                 return new SyncResult(uploaded, downloaded);
@@ -75,6 +77,7 @@ namespace FocusTracker.Data.Cloud
             db.SyncStates.RemoveRange(db.SyncStates);
             db.RemoteHourlyUsages.RemoveRange(db.RemoteHourlyUsages);
             db.RemoteDevices.RemoveRange(db.RemoteDevices);
+            db.RemoteActivityDays.RemoveRange(db.RemoteActivityDays);
             await db.SaveChangesAsync();
         }
 

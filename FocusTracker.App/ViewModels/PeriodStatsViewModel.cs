@@ -1,5 +1,6 @@
 ﻿using FocusTracker.Data;
 using FocusTracker.Data.Cloud;
+using FocusTracker.Data.Services;
 using FocusTracker.Domain;
 using FocusTracker.Domain.Interfaces;
 using FocusTracker.Domain.Models;
@@ -175,9 +176,26 @@ namespace FocusTracker.App.ViewModels
         }
 
 
+        // «Час за комп'ютером»: одночасна робота на кількох пристроях рахується один раз
+        private string _computerTimeText = string.Empty;
+        public string ComputerTimeText
+        {
+            get => _computerTimeText;
+            set { _computerTimeText = value; OnPropertyChanged(); }
+        }
+
+        private async Task LoadComputerTimeAsync(DateTime from, DateTime to)
+        {
+            var time = await App.Services.GetRequiredService<ComputerTimeService>().GetComputerTimeAsync(from, to);
+            ComputerTimeText = time > TimeSpan.Zero
+                ? $"Час за комп'ютером: {(int)time.TotalHours} год {time.Minutes} хв"
+                : string.Empty;
+        }
+
         private async void LoadDataForDate(DateTime date)
         {
             DailyPrograms.Clear();
+            await LoadComputerTimeAsync(date, date);
 
             var usageService = App.Services.GetRequiredService<IAppUsageStatService>();
             var programService = App.Services.GetRequiredService<IProgramService>();
@@ -325,6 +343,7 @@ namespace FocusTracker.App.ViewModels
         private async void LoadDataForRange()
         {
             DailyPrograms.Clear();
+            await LoadComputerTimeAsync(StartDate, EndDate);
 
             var usageService = App.Services.GetRequiredService<IAppUsageStatService>();
             var programService = App.Services.GetRequiredService<IProgramService>();
