@@ -182,3 +182,68 @@ public class MigrationTests
         }
     }
 }
+
+public class DatabaseInitializerTests
+{
+    private static string TempDbPath() => Path.Combine(Path.GetTempPath(), $"focustracker-init-{Guid.NewGuid():N}", "focus_tracker.db");
+
+    private static IDbContextFactory<FocusTracker.Data.FocusTrackerDbContext> Factory(string path) =>
+        new PooledDbContextFactory<FocusTracker.Data.FocusTrackerDbContext>(
+            new DbContextOptionsBuilder<FocusTracker.Data.FocusTrackerDbContext>()
+                .UseSqlite($"Data Source={path};Pooling=False")
+                .Options);
+
+    [Fact]
+    public void Creates_new_database()
+    {
+        var path = TempDbPath();
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        try
+        {
+            Assert.Null(FocusTracker.Data.DatabaseInitializer.Initialize(Factory(path), path));
+            Assert.False(FocusTracker.Data.DatabaseInitializer.IsLegacyDatabase(path));
+            // Повторний запуск нічого не архівує
+            Assert.Null(FocusTracker.Data.DatabaseInitializer.Initialize(Factory(path), path));
+        }
+        finally
+        {
+            Directory.Delete(Path.GetDirectoryName(path)!, true);
+        }
+    }
+
+    [Fact]
+    public void Archives_database_created_before_baseline_migration()
+    {
+        var path = TempDbPath();
+        var dir = Path.GetDirectoryName(path)!;
+        Directory.CreateDirectory(dir);
+        try
+        {
+            // Схема dev-версії до InitClean від 26.05.2025
+            using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = """
+                    CREATE TABLE "__EFMigrationsHistory" ("MigrationId" TEXT NOT NULL PRIMARY KEY, "ProductVersion" TEXT NOT NULL);
+                    INSERT INTO "__EFMigrationsHistory" VALUES ('20250522110045_InitClean', '9.0.4');
+                    CREATE TABLE "AppUsageStats" ("Id" INTEGER PRIMARY KEY, "AppName" TEXT NOT NULL, "Date" TEXT NOT NULL, "TotalTime" TEXT NOT NULL, "ActiveTime" TEXT NOT NULL);
+                    INSERT INTO "AppUsageStats" VALUES (1, 'chrome', '2025-05-24 00:00:00', '00:10:00', '00:05:00');
+                    """;
+                command.ExecuteNonQuery();
+            }
+
+            var archived = FocusTracker.Data.DatabaseInitializer.Initialize(Factory(path), path);
+
+            Assert.NotNull(archived);
+            Assert.True(File.Exists(archived));
+            using var db = Factory(path).CreateDbContext();
+            Assert.Empty(db.AppUsageStats);
+            Assert.Empty(db.Database.GetPendingMigrations());
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+}

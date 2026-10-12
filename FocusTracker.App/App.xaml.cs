@@ -37,6 +37,7 @@ namespace FocusTracker.App
         private CancellationTokenSource? _flushCts;
 
         private Mutex? _mutex;
+        private string _dbPath = "";
 
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -143,11 +144,29 @@ namespace FocusTracker.App
 
             StartPipeServer();
 
-            using (var db = Services.GetRequiredService<IDbContextFactory<FocusTrackerDbContext>>().CreateDbContext())
+            string? archivedDbPath;
+            try
             {
-                db.Database.Migrate();
-                // WAL дозволяє читати БД з UI, поки трекер пише
-                db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
+                archivedDbPath = DatabaseInitializer.Initialize(
+                    Services.GetRequiredService<IDbContextFactory<FocusTrackerDbContext>>(), _dbPath);
+            }
+            catch (Exception ex)
+            {
+                // Без бази застосунок не працює: не продовжуємо мовчки, а завершуємось з поясненням
+                AppLog.Error("Не вдалося відкрити базу даних", ex);
+                MessageBox.Show(
+                    $"Не вдалося відкрити базу даних:\n{ex.Message}\n\nДеталі в лозі: {AppLog.LogDirectory}",
+                    "FocusTracker", MessageBoxButton.OK, MessageBoxImage.Error);
+                Shutdown(1);
+                return;
+            }
+
+            if (archivedDbPath != null)
+            {
+                AppLog.Info($"Стару несумісну базу перенесено в {archivedDbPath}, створено нову");
+                MessageBox.Show(
+                    $"Знайдено базу даних старої версії, несумісну з поточною. Її збережено як\n{archivedDbPath}\nі створено нову порожню базу.",
+                    "FocusTracker", MessageBoxButton.OK, MessageBoxImage.Information);
             }
 
             ShowUiNotification = message => new CustomMessageBox(message).ShowDialog();
@@ -282,7 +301,8 @@ namespace FocusTracker.App
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "FocusTracker",
                 "focus_tracker.db");
-            Directory.CreateDirectory(Path.GetDirectoryName(dbPath));
+            Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+            _dbPath = dbPath;
 
             // Кожна операція відкриває власний короткоживучий DbContext через фабрику,
             // тож сервіси не тримають стан і можуть бути singleton
