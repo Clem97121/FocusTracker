@@ -51,6 +51,12 @@ namespace FocusTracker.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid>("SyncId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("SyncUpdatedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("TaskId")
                         .HasColumnType("INTEGER");
 
@@ -159,6 +165,12 @@ namespace FocusTracker.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid>("SyncId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("SyncUpdatedAt")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.ToTable("Restrictions");
@@ -222,6 +234,12 @@ namespace FocusTracker.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid>("SyncId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("SyncUpdatedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("Xp")
                         .HasColumnType("INTEGER");
 
@@ -249,6 +267,12 @@ namespace FocusTracker.Data.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("INTEGER");
 
+                    b.Property<Guid>("SyncId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("SyncUpdatedAt")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.ToTable("SkillCategories");
@@ -266,6 +290,27 @@ namespace FocusTracker.Data.Migrations
                     b.HasKey("Key");
 
                     b.ToTable("SyncStates");
+                });
+
+            modelBuilder.Entity("FocusTracker.Domain.Models.SyncTombstone", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("DeletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SyncId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SyncTombstones");
                 });
 
             modelBuilder.Entity("FocusTracker.Domain.Models.TaskProgram", b =>
@@ -405,6 +450,12 @@ namespace FocusTracker.Data.Migrations
 
                     b.Property<int>("SkillId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("SyncId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("SyncUpdatedAt")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()

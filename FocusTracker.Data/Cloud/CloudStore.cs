@@ -8,6 +8,9 @@ namespace FocusTracker.Data.Cloud
 
     public record CloudDevice(Guid DeviceId, string Name, DateTime LastSeenAtUtc);
 
+    // Категорія, навичка, задача, обмеження або запис XP; Data — JSON, null для видалених
+    public record CloudEntity(string Kind, Guid SyncId, string? Data, bool Deleted, DateTime UpdatedAtUtc, Guid UpdatedBy);
+
     // Налаштування програми зі сторінки «Застосунки»; UpdatedAtUtc — коли їх змінив користувач
     public record CloudProgramSettings(string Identifier, string Category, bool IsTracked, bool IsHidden,
         bool IgnoreIdle, DateTime UpdatedAtUtc, Guid UpdatedBy);
@@ -51,13 +54,25 @@ namespace FocusTracker.Data.Cloud
                 updated_at timestamptz not null default now()
             );
             alter table public.ft_program_icons enable row level security;
+            create table if not exists public.ft_entities (
+                kind text not null,
+                sync_id uuid not null,
+                data jsonb,
+                deleted boolean not null default false,
+                updated_at timestamptz not null,
+                updated_by uuid not null,
+                synced_at timestamptz not null default now(),
+                primary key (kind, sync_id)
+            );
+            create index if not exists ft_entities_synced_at on public.ft_entities (synced_at);
+            alter table public.ft_entities enable row level security;
             alter table public.ft_devices enable row level security;
             alter table public.ft_hourly_usage enable row level security;
             alter table public.ft_programs enable row level security;
             """;
 
         // Змінюється, коли SchemaSql отримує нові таблиці: пристрої перевіряють схему заново
-        public const int SchemaVersion = 2;
+        public const int SchemaVersion = 3;
 
         private readonly string _connectionString;
 
@@ -203,6 +218,65 @@ namespace FocusTracker.Data.Cloud
                     reader.GetBoolean(4),
                     reader.GetDateTime(5),
                     reader.GetGuid(6)), reader.GetDateTime(7)));
+            }
+            return rows;
+        }
+
+        // Перемагає новіша зміна, видалення — теж зміна
+        public async Task UploadEntitiesAsync(Guid deviceId, IReadOnlyList<CloudEntity> entities, CancellationToken token = default)
+        {
+            if (entities.Count == 0) return;
+
+            await using var connection = await OpenAsync(token);
+            await using var command = new NpgsqlCommand("""
+                insert into public.ft_entities (kind, sync_id, data, deleted, updated_at, updated_by, synced_at)
+                select u.kind, u.sync_id, u.data::jsonb, u.deleted, u.updated_at, @device, now()
+                from unnest(@kinds, @ids, @data, @deleted, @updated) as u(kind, sync_id, data, deleted, updated_at)
+                on conflict (kind, sync_id) do update
+                set data = excluded.data,
+                    deleted = excluded.deleted,
+                    updated_at = excluded.updated_at,
+                    updated_by = excluded.updated_by,
+                    synced_at = now()
+                where excluded.updated_at > public.ft_entities.updated_at;
+                """, connection);
+            command.Parameters.AddWithValue("device", deviceId);
+            command.Parameters.AddWithValue("kinds", entities.Select(e => e.Kind).ToArray());
+            command.Parameters.AddWithValue("ids", entities.Select(e => e.SyncId).ToArray());
+            command.Parameters.Add(new NpgsqlParameter("data", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = entities.Select(e => e.Data).ToArray() });
+            command.Parameters.AddWithValue("deleted", entities.Select(e => e.Deleted).ToArray());
+            command.Parameters.Add(new NpgsqlParameter("updated", NpgsqlDbType.Array | NpgsqlDbType.TimestampTz)
+            {
+                Value = entities.Select(e => DateTime.SpecifyKind(e.UpdatedAtUtc, DateTimeKind.Utc)).ToArray()
+            });
+            await command.ExecuteNonQueryAsync(token);
+        }
+
+        // Сутності, які інші пристрої записали після sinceUtc (час сервера)
+        public async Task<List<(CloudEntity Entity, DateTime SyncedAtUtc)>> DownloadEntitiesAsync(
+            Guid excludeDeviceId, DateTime? sinceUtc, CancellationToken token = default)
+        {
+            await using var connection = await OpenAsync(token);
+            await using var command = new NpgsqlCommand("""
+                select kind, sync_id, data::text, deleted, updated_at, updated_by, synced_at
+                from public.ft_entities
+                where updated_by <> @me and (@since::timestamptz is null or synced_at > @since)
+                order by synced_at;
+                """, connection);
+            command.Parameters.AddWithValue("me", excludeDeviceId);
+            command.Parameters.Add(new NpgsqlParameter("since", NpgsqlDbType.TimestampTz) { Value = (object?)sinceUtc ?? DBNull.Value });
+
+            var rows = new List<(CloudEntity, DateTime)>();
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+            {
+                rows.Add((new CloudEntity(
+                    reader.GetString(0),
+                    reader.GetGuid(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.GetBoolean(3),
+                    reader.GetDateTime(4),
+                    reader.GetGuid(5)), reader.GetDateTime(6)));
             }
             return rows;
         }

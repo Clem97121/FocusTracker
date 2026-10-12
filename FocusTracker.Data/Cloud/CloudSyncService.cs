@@ -8,7 +8,7 @@ namespace FocusTracker.Data.Cloud
 
     // Обмін почасовою статистикою з хмарною базою: свої зміни — туди,
     // рядки інших пристроїв — у локальну таблицю RemoteHourlyUsages
-    public class CloudSyncService
+    public partial class CloudSyncService
     {
         public const int UploadBatchSize = 500;
 
@@ -43,6 +43,8 @@ namespace FocusTracker.Data.Cloud
                 uploaded += await UploadProgramsAsync(cloud, deviceId, token);
                 downloaded += await DownloadProgramsAsync(cloud, deviceId, token);
                 await SyncIconsAsync(cloud, token);
+                uploaded += await UploadEntitiesAsync(cloud, deviceId, token);
+                downloaded += await DownloadEntitiesAsync(cloud, deviceId, token);
                 await RefreshDevicesAsync(cloud, deviceId, token);
 
                 return new SyncResult(uploaded, downloaded);

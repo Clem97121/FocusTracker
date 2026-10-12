@@ -3,9 +3,11 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace FocusTracker.Domain.Models;
 
-public class SkillCategory : ObservableObject
+public class SkillCategory : ObservableObject, ISyncEntity
 {
     public int Id { get; set; }
+    public Guid SyncId { get; set; }
+    public DateTime? SyncUpdatedAt { get; set; }
 
     private string _name = string.Empty;
     public string Name

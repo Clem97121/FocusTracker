@@ -24,6 +24,84 @@ namespace FocusTracker.Data
         public DbSet<RemoteHourlyUsage> RemoteHourlyUsages { get; set; }
         public DbSet<RemoteDevice> RemoteDevices { get; set; }
         public DbSet<SyncState> SyncStates { get; set; }
+        public DbSet<SyncTombstone> SyncTombstones { get; set; }
+
+        // Увімкнено, коли застосовуються зміни з інших пристроїв: тоді їх не позначаємо як власні
+        public bool SuppressSyncTracking { get; set; }
+
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            var touched = TrackSyncChanges();
+            var result = base.SaveChanges(acceptAllChangesOnSuccess);
+            if (touched.Tasks.Count > 0)
+                TaskItems.Where(t => touched.Tasks.Contains(t.Id))
+                    .ExecuteUpdate(s => s.SetProperty(t => t.SyncUpdatedAt, touched.At));
+            if (touched.Restrictions.Count > 0)
+                Restrictions.Where(r => touched.Restrictions.Contains(r.Id))
+                    .ExecuteUpdate(s => s.SetProperty(r => r.SyncUpdatedAt, touched.At));
+            return result;
+        }
+
+        public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        {
+            var touched = TrackSyncChanges();
+            var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+            if (touched.Tasks.Count > 0)
+                await TaskItems.Where(t => touched.Tasks.Contains(t.Id))
+                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.SyncUpdatedAt, touched.At), cancellationToken);
+            if (touched.Restrictions.Count > 0)
+                await Restrictions.Where(r => touched.Restrictions.Contains(r.Id))
+                    .ExecuteUpdateAsync(s => s.SetProperty(r => r.SyncUpdatedAt, touched.At), cancellationToken);
+            return result;
+        }
+
+        // Ставить SyncId і час зміни, записує сліди видалень. Зміни зв'язків (програми задачі,
+        // правила й цілі обмеження) позначають змінами батьківської сутності — повертаємо їхні Id.
+        private (DateTime At, List<int> Tasks, List<int> Restrictions) TrackSyncChanges()
+        {
+            var now = DateTime.UtcNow;
+            if (SuppressSyncTracking)
+                return (now, new List<int>(), new List<int>());
+
+            foreach (var entry in ChangeTracker.Entries<ISyncEntity>().ToList())
+            {
+                switch (entry.State)
+                {
+                    case EntityState.Added:
+                    case EntityState.Modified:
+                        if (entry.Entity.SyncId == Guid.Empty)
+                            entry.Entity.SyncId = Guid.NewGuid();
+                        entry.Entity.SyncUpdatedAt = now;
+                        break;
+                    case EntityState.Deleted when entry.Entity.SyncId != Guid.Empty:
+                        SyncTombstones.Add(new SyncTombstone
+                        {
+                            Kind = SyncKinds.Of(entry.Entity),
+                            SyncId = entry.Entity.SyncId,
+                            DeletedAt = now
+                        });
+                        break;
+                }
+            }
+
+            var changedStates = new[] { EntityState.Added, EntityState.Modified, EntityState.Deleted };
+            var tasks = ChangeTracker.Entries<TaskProgram>()
+                .Where(e => changedStates.Contains(e.State))
+                .Select(e => e.Entity.TaskId)
+                .Distinct()
+                .ToList();
+            var restrictions = ChangeTracker.Entries<RestrictionRule>()
+                .Where(e => changedStates.Contains(e.State))
+                .Select(e => e.Entity.RestrictionId)
+                .Concat(ChangeTracker.Entries<RestrictionToProgram>()
+                    .Where(e => changedStates.Contains(e.State))
+                    .Select(e => e.Entity.RestrictionId))
+                .Where(id => id != 0)
+                .Distinct()
+                .ToList();
+
+            return (now, tasks, restrictions);
+        }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
