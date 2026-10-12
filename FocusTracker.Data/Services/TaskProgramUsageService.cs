@@ -1,28 +1,31 @@
-﻿using FocusTracker.Domain.Interfaces;
+using FocusTracker.Domain.Interfaces;
 using FocusTracker.Domain.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace FocusTracker.Data.Services
 {
     public class TaskProgramUsageService : ITaskProgramUsageService
     {
-        private readonly FocusTrackerDbContext _db;
+        private readonly IDbContextFactory<FocusTrackerDbContext> _dbFactory;
 
-        public TaskProgramUsageService(FocusTrackerDbContext db)
+        public TaskProgramUsageService(IDbContextFactory<FocusTrackerDbContext> dbFactory)
         {
-            _db = db;
+            _dbFactory = dbFactory;
         }
 
         public List<TaskProgramUsage> GetByTaskId(int taskId)
         {
-            return _db.TaskProgramUsages
+            using var db = _dbFactory.CreateDbContext();
+            return db.TaskProgramUsages
+                .AsNoTracking()
                 .Where(u => u.TaskId == taskId)
                 .ToList();
         }
 
-
         public void AddOrUpdate(TaskProgramUsage usage)
         {
-            var existing = _db.TaskProgramUsages
+            using var db = _dbFactory.CreateDbContext();
+            var existing = db.TaskProgramUsages
                 .FirstOrDefault(u => u.TaskId == usage.TaskId && u.ProgramId == usage.ProgramId);
 
             if (existing != null)
@@ -39,20 +42,16 @@ namespace FocusTracker.Data.Services
             }
             else
             {
-                _db.TaskProgramUsages.Add(usage);
+                db.TaskProgramUsages.Add(usage);
             }
 
-            _db.SaveChanges();
+            db.SaveChanges();
         }
-
-
-
 
         public List<TaskProgramUsage> GetAll()
         {
-            return _db.TaskProgramUsages.ToList();
+            using var db = _dbFactory.CreateDbContext();
+            return db.TaskProgramUsages.AsNoTracking().ToList();
         }
-
-
     }
 }

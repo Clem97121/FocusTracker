@@ -12,39 +12,46 @@ namespace FocusTracker.Data.Services
 {
     public class TrackedProgramService : ITrackedProgramService
     {
-        private readonly FocusTrackerDbContext _db;
+        private readonly IDbContextFactory<FocusTrackerDbContext> _dbFactory;
 
-        public TrackedProgramService(FocusTrackerDbContext db)
+        public TrackedProgramService(IDbContextFactory<FocusTrackerDbContext> dbFactory)
         {
-            _db = db;
+            _dbFactory = dbFactory;
         }
 
-        public List<TrackedProgram> GetAll() => _db.TrackedPrograms.ToList();
+        public List<TrackedProgram> GetAll()
+        {
+            using var db = _dbFactory.CreateDbContext();
+            return db.TrackedPrograms.AsNoTracking().ToList();
+        }
 
         public void Add(TrackedProgram program)
         {
-            _db.TrackedPrograms.Add(program);
-            _db.SaveChanges();
+            using var db = _dbFactory.CreateDbContext();
+            db.TrackedPrograms.Add(program);
+            db.SaveChanges();
         }
 
         public void Delete(int id)
         {
-            var prog = _db.TrackedPrograms.Find(id);
+            using var db = _dbFactory.CreateDbContext();
+            var prog = db.TrackedPrograms.Find(id);
             if (prog != null)
             {
-                _db.TrackedPrograms.Remove(prog);
-                _db.SaveChanges();
+                db.TrackedPrograms.Remove(prog);
+                db.SaveChanges();
             }
         }
 
         // старый метод, можно удалить позже
         public void UpdateDisplayNameIfNeeded(string identifier, string displayName)
         {
-            var program = _db.TrackedPrograms.FirstOrDefault(p => p.Identifier == identifier);
+            using var db = _dbFactory.CreateDbContext();
+            var program = db.TrackedPrograms.FirstOrDefault(p => p.Identifier == identifier);
             if (program != null && program.DisplayName != displayName && !string.IsNullOrWhiteSpace(displayName))
             {
                 program.DisplayName = displayName;
-                _db.SaveChanges();
+                db.SaveChanges();
             }
         }
 
@@ -52,6 +59,9 @@ namespace FocusTracker.Data.Services
         public async Task UpdateDisplayInfoIfNeededAsync(TrackedProgram program)
         {
             if (program == null || string.IsNullOrWhiteSpace(program.Identifier))
+                return;
+
+            if (!string.IsNullOrWhiteSpace(program.DisplayName) && program.IconBytes != null)
                 return;
 
             var exePath = FindExecutablePath(program.Identifier);
@@ -84,8 +94,9 @@ namespace FocusTracker.Data.Services
                 }
             }
 
-            _db.TrackedPrograms.Update(program);
-            await _db.SaveChangesAsync();
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            db.Entry(program).State = EntityState.Modified;
+            await db.SaveChangesAsync();
         }
 
         // 🔍 Метод для нахождения EXE — можешь заменить на свой

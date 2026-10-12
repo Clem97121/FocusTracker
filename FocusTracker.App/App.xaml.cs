@@ -16,6 +16,7 @@ using Microsoft.Win32;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.IO.Pipes;
+using FocusTracker.App.Helpers;
 
 namespace FocusTracker.App
 {
@@ -31,10 +32,12 @@ namespace FocusTracker.App
 
         private Timer _notificationTimer;
         private Timer _impulseTimer;
+        private UserActivityTracker? _userActivity;
+        private UsageRecorder? _usageRecorder;
+        private CancellationTokenSource? _flushCts;
 
         private Mutex? _mutex;
-
-        private readonly Dictionary<string, DateTime> _violationCache = new();
+        private string _dbPath = "";
 
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -86,12 +89,18 @@ namespace FocusTracker.App
         private void AddToStartup()
         {
             string appName = "FocusTracker";
-            string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            // Assembly.Location у .NET 8 вказує на .dll, а запускати треба .exe
+            string? exePath = Environment.ProcessPath;
+            if (string.IsNullOrEmpty(exePath)) return;
 
-            using RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-            if (key.GetValue(appName) == null)
+            using RegistryKey? key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
+            if (key == null) return;
+
+            var expected = $"\"{exePath}\"";
+            // Перезаписуємо і старий хибний шлях до .dll з попередніх версій
+            if (!string.Equals(key.GetValue(appName) as string, expected, StringComparison.OrdinalIgnoreCase))
             {
-                key.SetValue(appName, $"\"{exePath}\"");
+                key.SetValue(appName, expected);
             }
         }
 
@@ -119,86 +128,169 @@ namespace FocusTracker.App
 
             base.OnStartup(e);
 
-            AddToStartup();
+            SetupExceptionHandling();
+            AppLog.Info("Запуск FocusTracker");
+
+            try
+            {
+                AddToStartup();
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Не вдалося додати в автозапуск", ex);
+            }
+
             ConfigureServices();
 
             StartPipeServer();
 
-            using (var scope = Services.CreateScope())
+            string? archivedDbPath;
+            try
             {
-                var db = scope.ServiceProvider.GetRequiredService<FocusTrackerDbContext>();
-                db.Database.Migrate();
+                archivedDbPath = DatabaseInitializer.Initialize(
+                    Services.GetRequiredService<IDbContextFactory<FocusTrackerDbContext>>(), _dbPath);
+            }
+            catch (Exception ex)
+            {
+                // Без бази застосунок не працює: не продовжуємо мовчки, а завершуємось з поясненням
+                AppLog.Error("Не вдалося відкрити базу даних", ex);
+                MessageBox.Show(
+                    $"Не вдалося відкрити базу даних:\n{ex.Message}\n\nДеталі в лозі: {AppLog.LogDirectory}",
+                    "FocusTracker", MessageBoxButton.OK, MessageBoxImage.Error);
+                Shutdown(1);
+                return;
+            }
+
+            if (archivedDbPath != null)
+            {
+                AppLog.Info($"Стару несумісну базу перенесено в {archivedDbPath}, створено нову");
+                MessageBox.Show(
+                    $"Знайдено базу даних старої версії, несумісну з поточною. Її збережено як\n{archivedDbPath}\nі створено нову порожню базу.",
+                    "FocusTracker", MessageBoxButton.OK, MessageBoxImage.Information);
             }
 
             ShowUiNotification = message => new CustomMessageBox(message).ShowDialog();
 
-            using (var scope = Services.CreateScope())
+            try
             {
                 var syncService = Services.GetRequiredService<ProgramSyncService>();
                 await syncService.SyncAsync();
             }
+            catch (Exception ex)
+            {
+                AppLog.Error("Помилка синхронізації програм", ex);
+            }
 
             _notificationTimer = new Timer(async _ =>
             {
-                using var scope = Services.CreateScope();
-                var service = scope.ServiceProvider.GetRequiredService<IRestrictionNotificationService>();
-                await service.CheckAndNotifyAsync();
+                try
+                {
+                    var service = Services.GetRequiredService<IRestrictionNotificationService>();
+                    await service.CheckAndNotifyAsync();
+                }
+                catch (Exception ex)
+                {
+                    AppLog.Error("Помилка перевірки попереджень про обмеження", ex);
+                }
             }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
 
             _impulseTimer = new Timer(async _ =>
             {
-                using var scope = Services.CreateScope();
-                var service = scope.ServiceProvider.GetRequiredService<IImpulseReminderService>();
-                await service.CheckAndRemindAsync();
+                try
+                {
+                    var service = Services.GetRequiredService<IImpulseReminderService>();
+                    await service.CheckAndRemindAsync();
+                }
+                catch (Exception ex)
+                {
+                    AppLog.Error("Помилка імпульсного нагадування", ex);
+                }
             }, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
 
-            var userActivity = new UserActivityTracker();
-            userActivity.Start();
+            _userActivity = new UserActivityTracker();
+            _userActivity.Start();
+
+            _usageRecorder = new UsageRecorder(Services);
+            var userActivity = _userActivity;
+            var usageRecorder = _usageRecorder;
 
             var programServiceForTracker = Services.GetRequiredService<IProgramService>();
             var nameResolver = Services.GetRequiredService<ProgramNameResolverService>();
 
+            // Щосекунди лише додаємо час у буфер у пам'яті, без звернень до БД
             _windowTracker = new ActiveWindowTracker(
-                async (appName, totalTime) =>
+                (appName, totalTime) =>
                 {
-                    using var scope = Services.CreateScope();
-                    var statService = scope.ServiceProvider.GetRequiredService<IAppUsageStatService>();
-                    var evaluator = scope.ServiceProvider.GetRequiredService<IRestrictionEvaluator>();
-                    var notifier = scope.ServiceProvider.GetRequiredService<INotificationService>();
-
                     var activeTime = userActivity.GetAndResetActiveTime();
-                    await statService.AddOrUpdateUsageAsync(appName, totalTime, activeTime);
-
-                    var stats = await statService.GetStatsForTodayAsync();
-                    var todayStat = stats.FirstOrDefault(s => s.AppName == appName);
-                    var total = todayStat?.TotalTime ?? TimeSpan.Zero;
-
-                    if (!evaluator.TryGetViolatedRestrictions(appName, total, out var notes)) return;
-
-                    var cacheKey = $"{appName}_{string.Join(",", notes)}";
-                    if (_violationCache.TryGetValue(cacheKey, out var lastShown) && (DateTime.Now - lastShown).TotalSeconds < 5)
-                        return;
-
-                    _violationCache[cacheKey] = DateTime.Now;
-                    var message = $"Програму \"{appName}\" було закрито через перевищення обмеження:\n• {string.Join("\n• ", notes)}";
-                    notifier.ShowMessage(message, "Обмеження перевищено");
-
-                    var processes = Process.GetProcessesByName(appName);
-                    foreach (var proc in processes)
-                    {
-                        try { proc.Kill(); } catch { }
-                    }
+                    usageRecorder.Add(appName, totalTime, activeTime);
                 },
                 programServiceForTracker,
                 nameResolver
             );
+            _windowTracker.Error += ex => AppLog.Error("Помилка трекера вікон", ex);
 
             _windowTracker.Start();
+            StartUsageFlushLoop();
             SetupTrayIcon();
 
             var mainWindow = new MainWindow();
             MainWindow = mainWindow;
             mainWindow.Show();
+        }
+
+        // Раз на кілька секунд записуємо накопичений час у БД і перевіряємо обмеження
+        private void StartUsageFlushLoop()
+        {
+            _flushCts = new CancellationTokenSource();
+            var token = _flushCts.Token;
+
+            Task.Run(async () =>
+            {
+                using var timer = new PeriodicTimer(UsageRecorder.FlushInterval);
+                try
+                {
+                    while (await timer.WaitForNextTickAsync(token))
+                    {
+                        try
+                        {
+                            await _usageRecorder!.FlushAsync();
+                            await _usageRecorder.EnforceRestrictionsAsync(_windowTracker.CurrentApp);
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLog.Error("Помилка запису статистики", ex);
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                }
+            });
+        }
+
+        private void SetupExceptionHandling()
+        {
+            DispatcherUnhandledException += (s, args) =>
+            {
+                AppLog.Error("Необроблена помилка в UI", args.Exception);
+                args.Handled = true;
+                try
+                {
+                    MessageBox.Show(
+                        $"Сталася помилка: {args.Exception.Message}\n\nДеталі в лозі: {AppLog.LogDirectory}",
+                        "FocusTracker", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                catch { }
+            };
+
+            AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+                AppLog.Error("Критична помилка", args.ExceptionObject as Exception);
+
+            TaskScheduler.UnobservedTaskException += (s, args) =>
+            {
+                AppLog.Error("Необроблена помилка у фоновій задачі", args.Exception);
+                args.SetObserved();
+            };
         }
 
         private void ConfigureServices()
@@ -209,23 +301,26 @@ namespace FocusTracker.App
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "FocusTracker",
                 "focus_tracker.db");
-            Directory.CreateDirectory(Path.GetDirectoryName(dbPath));
+            Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+            _dbPath = dbPath;
 
-            services.AddDbContext<FocusTrackerDbContext>(options =>
-                options.UseSqlite($"Data Source={dbPath}"));
+            // Кожна операція відкриває власний короткоживучий DbContext через фабрику,
+            // тож сервіси не тримають стан і можуть бути singleton
+            services.AddDbContextFactory<FocusTrackerDbContext>(options =>
+                options.UseSqlite($"Data Source={dbPath};Default Timeout=30"));
 
-            services.AddScoped<IAppUsageStatService, AppUsageStatService>();
-            services.AddScoped<IRestrictionEvaluator, RestrictionEvaluator>();
-            services.AddScoped<IProgramService, ProgramService>();
-            services.AddScoped<ISkillService, SkillService>();
-            services.AddScoped<ISkillCategoryService, SkillCategoryService>();
-            services.AddScoped<ITaskItemService, TaskItemService>();
-            services.AddScoped<ITaskProgramService, TaskProgramService>();
-            services.AddScoped<ITaskProgramUsageService, TaskProgramUsageService>();
-            services.AddScoped<ITrackedProgramService, TrackedProgramService>();
-            services.AddScoped<IRestrictionService, RestrictionService>();
-            services.AddScoped<IRestrictionNotificationService, RestrictionNotificationService>();
-            services.AddScoped<IImpulseReminderService, ImpulseReminderService>();
+            services.AddSingleton<IAppUsageStatService, AppUsageStatService>();
+            services.AddSingleton<IRestrictionEvaluator, RestrictionEvaluator>();
+            services.AddSingleton<IProgramService, ProgramService>();
+            services.AddSingleton<ISkillService, SkillService>();
+            services.AddSingleton<ISkillCategoryService, SkillCategoryService>();
+            services.AddSingleton<ITaskItemService, TaskItemService>();
+            services.AddSingleton<ITaskProgramService, TaskProgramService>();
+            services.AddSingleton<ITaskProgramUsageService, TaskProgramUsageService>();
+            services.AddSingleton<ITrackedProgramService, TrackedProgramService>();
+            services.AddSingleton<IRestrictionService, RestrictionService>();
+            services.AddSingleton<IRestrictionNotificationService, RestrictionNotificationService>();
+            services.AddSingleton<IImpulseReminderService, ImpulseReminderService>();
 
             services.AddSingleton<INotificationService, MessageBoxNotificationService>();
             services.AddSingleton<ProgramNameResolverService>();
@@ -238,7 +333,8 @@ namespace FocusTracker.App
         {
             _notifyIcon = new System.Windows.Forms.NotifyIcon
             {
-                Icon = new System.Drawing.Icon("icon.ico"),
+                // Шлях від папки з exe: при автозапуску робоча папка — System32
+                Icon = new System.Drawing.Icon(Path.Combine(AppContext.BaseDirectory, "icon.ico")),
                 Visible = true,
                 Text = "FocusTracker",
                 ContextMenuStrip = new System.Windows.Forms.ContextMenuStrip()
@@ -265,6 +361,24 @@ namespace FocusTracker.App
 
         protected override void OnExit(ExitEventArgs e)
         {
+            try
+            {
+                _windowTracker?.Stop();
+                _flushCts?.Cancel();
+                _userActivity?.Stop();
+                _notificationTimer?.Dispose();
+                _impulseTimer?.Dispose();
+                // Дописуємо в БД те, що лишилось у буфері
+                // Task.Run: без UI-контексту, інакше Wait на UI-потоці може зависнути
+                if (_usageRecorder != null)
+                    Task.Run(() => _usageRecorder.FlushAsync()).Wait(TimeSpan.FromSeconds(5));
+                AppLog.Info("Завершення FocusTracker");
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Помилка під час завершення", ex);
+            }
+
             _notifyIcon?.Dispose();
             _mutex?.ReleaseMutex();
             _mutex?.Dispose();

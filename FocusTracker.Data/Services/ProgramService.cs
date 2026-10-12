@@ -1,4 +1,4 @@
-﻿using FocusTracker.Domain.Interfaces;
+using FocusTracker.Domain.Interfaces;
 using FocusTracker.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
@@ -9,43 +9,47 @@ namespace FocusTracker.Data.Services
 {
     public class ProgramService : IProgramService
     {
-        private readonly FocusTrackerDbContext _db;
+        private readonly IDbContextFactory<FocusTrackerDbContext> _dbFactory;
         private readonly ITrackedProgramService _trackedProgramService;
 
-        public ProgramService(FocusTrackerDbContext db, ITrackedProgramService trackedProgramService)
+        public ProgramService(IDbContextFactory<FocusTrackerDbContext> dbFactory, ITrackedProgramService trackedProgramService)
         {
-            _db = db;
+            _dbFactory = dbFactory;
             _trackedProgramService = trackedProgramService;
         }
 
         public async Task<List<TrackedProgram>> GetAllAsync()
         {
-            return await _db.TrackedPrograms.ToListAsync();
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            return await db.TrackedPrograms.AsNoTracking().ToListAsync();
         }
 
         public async Task UpdateAsync(TrackedProgram program)
         {
-            _db.TrackedPrograms.Update(program);
-            await _db.SaveChangesAsync();
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            db.Entry(program).State = EntityState.Modified;
+            await db.SaveChangesAsync();
         }
 
         public async Task AddAsync(TrackedProgram program)
         {
-            await _db.TrackedPrograms.AddAsync(program);
-            await _db.SaveChangesAsync();
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            await db.TrackedPrograms.AddAsync(program);
+            await db.SaveChangesAsync();
         }
 
         public async Task UpdateDisplayNameIfNeededAsync(string identifier, string displayName)
         {
             if (string.IsNullOrWhiteSpace(displayName)) return;
 
-            var program = await _db.TrackedPrograms
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            var program = await db.TrackedPrograms
                 .FirstOrDefaultAsync(p => p.Identifier == identifier);
 
             if (program != null && program.DisplayName != displayName)
             {
                 program.DisplayName = displayName;
-                await _db.SaveChangesAsync();
+                await db.SaveChangesAsync();
             }
         }
 
@@ -53,13 +57,14 @@ namespace FocusTracker.Data.Services
         {
             if (iconBytes == null || iconBytes.Length == 0) return;
 
-            var program = await _db.TrackedPrograms
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            var program = await db.TrackedPrograms
                 .FirstOrDefaultAsync(p => p.Identifier == identifier);
 
             if (program != null && !iconBytes.SequenceEqual(program.IconBytes ?? System.Array.Empty<byte>()))
             {
                 program.IconBytes = iconBytes;
-                await _db.SaveChangesAsync();
+                await db.SaveChangesAsync();
             }
         }
 

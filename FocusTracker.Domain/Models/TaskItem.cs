@@ -11,6 +11,7 @@ public class TaskItem
     public int Difficulty { get; set; }
     public DateTime DateCreated { get; set; }
     public bool Completed { get; set; }
+    [NotMapped]
     public List<TrackedProgram> Programs { get; set; } = new();
     public Skill Skill { get; set; }
 

@@ -9,11 +9,11 @@ namespace FocusTracker.Data.Services
 {
     public class RestrictionEvaluator : IRestrictionEvaluator
     {
-        private readonly FocusTrackerDbContext _db;
+        private readonly IDbContextFactory<FocusTrackerDbContext> _dbFactory;
 
-        public RestrictionEvaluator(FocusTrackerDbContext db)
+        public RestrictionEvaluator(IDbContextFactory<FocusTrackerDbContext> dbFactory)
         {
-            _db = db;
+            _dbFactory = dbFactory;
         }
 
         public bool IsViolated(string appName, TimeSpan activeTime, out string violatedNote)
@@ -29,10 +29,11 @@ namespace FocusTracker.Data.Services
 
         public bool TryGetViolatedRestrictions(string appName, TimeSpan activeTime, out List<string> violatedNotes)
         {
+            using var db = _dbFactory.CreateDbContext();
             violatedNotes = new List<string>();
             var now = DateTime.Now;
 
-            var restrictions = _db.Restrictions
+            var restrictions = db.Restrictions
                 .Include(r => r.Rules)
                 .Include(r => r.Targets)
                     .ThenInclude(link => link.Program)
@@ -63,7 +64,7 @@ namespace FocusTracker.Data.Services
                                     if (string.IsNullOrWhiteSpace(programIdentifier))
                                         continue;
 
-                                    var stat = _db.AppUsageStats
+                                    var stat = db.AppUsageStats
                                         .FirstOrDefault(s => s.AppName == programIdentifier && s.Date == now.Date);
 
                                     if (stat != null)
@@ -102,7 +103,7 @@ namespace FocusTracker.Data.Services
                                 {
                                     var today = DateTime.Today;
 
-                                    var usedSeconds = _db.TaskProgramUsages
+                                    var usedSeconds = db.TaskProgramUsages
                                         .Include(x => x.Task)
                                         .Where(x => x.Task.Completed && x.RecordedAt.HasValue && x.RecordedAt.Value.Date == today)
                                         .Sum(x => x.CountedActiveSeconds);

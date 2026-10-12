@@ -1,5 +1,6 @@
-﻿using FocusTracker.Domain.Interfaces;
+using FocusTracker.Domain.Interfaces;
 using FocusTracker.Domain.Models;
+using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -7,59 +8,70 @@ namespace FocusTracker.Data.Services
 {
     public class TaskItemService : ITaskItemService
     {
-        private readonly FocusTrackerDbContext _db;
+        private readonly IDbContextFactory<FocusTrackerDbContext> _dbFactory;
 
-        public TaskItemService(FocusTrackerDbContext db)
+        public TaskItemService(IDbContextFactory<FocusTrackerDbContext> dbFactory)
         {
-            _db = db;
+            _dbFactory = dbFactory;
         }
 
         public List<TaskItem> GetAll()
         {
-            return _db.TaskItems.ToList();
+            using var db = _dbFactory.CreateDbContext();
+            return db.TaskItems.AsNoTracking().ToList();
         }
 
         public List<TaskItem> GetBySkillId(int skillId)
         {
-            return _db.TaskItems.Where(t => t.SkillId == skillId).ToList();
+            using var db = _dbFactory.CreateDbContext();
+            return db.TaskItems.AsNoTracking().Where(t => t.SkillId == skillId).ToList();
         }
 
         public TaskItem? GetById(int id)
         {
-            return _db.TaskItems.FirstOrDefault(t => t.Id == id);
+            using var db = _dbFactory.CreateDbContext();
+            return db.TaskItems.AsNoTracking().FirstOrDefault(t => t.Id == id);
         }
 
         // 🔧 ВАЖНО: возвращаем task с присвоенным Id
         public TaskItem Add(TaskItem task)
         {
-            _db.TaskItems.Add(task);
-            _db.SaveChanges();
+            using var db = _dbFactory.CreateDbContext();
+            db.TaskItems.Add(task);
+            db.SaveChanges();
             return task;
         }
 
+        // Копіюємо лише скалярні поля, щоб не зачепити Skill та інші навігації
         public void Update(TaskItem task)
         {
-            _db.TaskItems.Update(task);
-            _db.SaveChanges();
+            using var db = _dbFactory.CreateDbContext();
+            var existing = db.TaskItems.Find(task.Id);
+            if (existing == null) return;
+
+            db.Entry(existing).CurrentValues.SetValues(task);
+            db.SaveChanges();
         }
 
         public void Delete(int id)
         {
-            var task = _db.TaskItems.Find(id);
+            using var db = _dbFactory.CreateDbContext();
+            var task = db.TaskItems.Find(id);
             if (task != null)
             {
-                _db.TaskItems.Remove(task);
-                _db.SaveChanges();
+                db.TaskItems.Remove(task);
+                db.SaveChanges();
             }
         }
 
         public void MarkCompleted(int id)
         {
-            var task = _db.TaskItems.Find(id);
+            using var db = _dbFactory.CreateDbContext();
+            var task = db.TaskItems.Find(id);
             if (task != null)
             {
                 task.Completed = true;
-                _db.SaveChanges();
+                db.SaveChanges();
             }
         }
     }
