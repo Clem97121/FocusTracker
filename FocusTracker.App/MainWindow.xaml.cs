@@ -130,6 +130,13 @@ namespace FocusTracker.App
             HighlightNavButton((Button)sender);
         }
 
+        private void ShowSettingsPage(object sender, RoutedEventArgs e)
+        {
+            MainContent.Content = new SettingsPage();
+            SetPageTitle("Налаштування");
+            HighlightNavButton((Button)sender);
+        }
+
         private const int WM_NCHITTEST = 0x0084;
         private const int HTLEFT = 10;
         private const int HTRIGHT = 11;

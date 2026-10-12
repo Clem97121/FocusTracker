@@ -38,6 +38,16 @@ namespace FocusTracker.Data.Services
             await db.SaveChangesAsync();
         }
 
+        public async Task<HashSet<string>> GetIgnoreIdleIdentifiersAsync()
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            var identifiers = await db.TrackedPrograms
+                .Where(p => p.IgnoreIdle)
+                .Select(p => p.Identifier)
+                .ToListAsync();
+            return new HashSet<string>(identifiers, StringComparer.OrdinalIgnoreCase);
+        }
+
         public async Task UpdateDisplayNameIfNeededAsync(string identifier, string displayName)
         {
             if (string.IsNullOrWhiteSpace(displayName)) return;

@@ -273,6 +273,9 @@ namespace FocusTracker.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("IgnoreIdle")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsHidden")
                         .HasColumnType("INTEGER");
 

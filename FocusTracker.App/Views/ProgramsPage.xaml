@@ -85,6 +85,9 @@
                                     <CheckBox Content="&#xE890;" ToolTip="Сховати"
                                               IsChecked="{Binding IsHidden, Mode=TwoWay}"
                                               Style="{StaticResource IconCheckBoxStyle}" Margin="0 0 8 0"/>
+                                    <CheckBox Content="&#xE916;" ToolTip="Не враховувати простій: час рахується навіть без миші й клавіатури"
+                                              IsChecked="{Binding IgnoreIdle, Mode=TwoWay}"
+                                              Style="{StaticResource IconCheckBoxStyle}" Margin="0 0 8 0"/>
                                     <ComboBox SelectedValue="{Binding Category, Mode=TwoWay}"
           SelectedValuePath="Content"
           Width="100"
