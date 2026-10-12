@@ -131,6 +131,8 @@ namespace FocusTracker.App
             SetupExceptionHandling();
             AppLog.Info("Запуск FocusTracker");
 
+#if !DEBUG
+            // Лише Release: dev-збірки з клону не повинні перехоплювати автозапуск
             try
             {
                 AddToStartup();
@@ -139,6 +141,7 @@ namespace FocusTracker.App
             {
                 AppLog.Error("Не вдалося додати в автозапуск", ex);
             }
+#endif
 
             ConfigureServices();
 
@@ -167,6 +170,18 @@ namespace FocusTracker.App
                 MessageBox.Show(
                     $"Знайдено базу даних старої версії, несумісну з поточною. Її збережено як\n{archivedDbPath}\nі створено нову порожню базу.",
                     "FocusTracker", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+
+            try
+            {
+                var backupPath = DatabaseBackup.CreateDailyBackup(
+                    _dbPath, Path.Combine(Path.GetDirectoryName(_dbPath)!, "backups"), DateTime.Now);
+                if (backupPath != null)
+                    AppLog.Info($"Створено резервну копію бази: {backupPath}");
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Не вдалося створити резервну копію бази", ex);
             }
 
             ShowUiNotification = message => new CustomMessageBox(message).ShowDialog();
