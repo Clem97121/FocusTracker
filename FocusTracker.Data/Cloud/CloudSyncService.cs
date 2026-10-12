@@ -15,6 +15,8 @@ namespace FocusTracker.Data.Cloud
         private const string UploadWatermarkKey = "cloud.upload_watermark";
         private const string DownloadWatermarkKey = "cloud.download_watermark";
         private const string SchemaReadyKey = "cloud.schema_ready_for";
+        private const string ProgramsUploadWatermarkKey = "cloud.programs_upload_watermark";
+        private const string ProgramsDownloadWatermarkKey = "cloud.programs_download_watermark";
 
         // Транзакція на сервері може зафіксуватись пізніше за свій updated_at,
         // тож завантажуємо з запасом; повторні рядки просто перезапишуться
@@ -38,6 +40,9 @@ namespace FocusTracker.Data.Cloud
 
                 var uploaded = await UploadAsync(cloud, deviceId, token);
                 var downloaded = await DownloadAsync(cloud, deviceId, token);
+                uploaded += await UploadProgramsAsync(cloud, deviceId, token);
+                downloaded += await DownloadProgramsAsync(cloud, deviceId, token);
+                await SyncIconsAsync(cloud, token);
                 await RefreshDevicesAsync(cloud, deviceId, token);
 
                 return new SyncResult(uploaded, downloaded);
@@ -73,7 +78,7 @@ namespace FocusTracker.Data.Cloud
 
         private async Task EnsureSchemaAsync(CloudStore cloud, Guid deviceId, CancellationToken token)
         {
-            var marker = deviceId.ToString();
+            var marker = $"{deviceId}:{CloudStore.SchemaVersion}";
             if (await GetStateAsync(SchemaReadyKey) == marker) return;
 
             await cloud.EnsureSchemaAsync(token);
@@ -166,6 +171,120 @@ namespace FocusTracker.Data.Cloud
                 });
             }
 
+            await db.SaveChangesAsync(token);
+        }
+
+        private async Task<int> UploadProgramsAsync(CloudStore cloud, Guid deviceId, CancellationToken token)
+        {
+            var startedAt = DateTime.UtcNow;
+            var watermark = ParseDate(await GetStateAsync(ProgramsUploadWatermarkKey));
+
+            List<TrackedProgram> changed;
+            await using (var db = await _dbFactory.CreateDbContextAsync(token))
+            {
+                var query = db.TrackedPrograms.AsQueryable();
+                if (watermark != null)
+                    query = query.Where(p => p.SettingsUpdatedAt > watermark.Value);
+                changed = await query.ToListAsync(token);
+
+                // Уперше відправляємо всі програми. Налаштовані до появи синхронізації (не за замовчуванням)
+                // отримують поточний час і перемагають; решта — найстаршу дату, щоб не перетерти хмарні
+                if (watermark == null)
+                {
+                    foreach (var program in changed.Where(p => p.SettingsUpdatedAt == null && !HasDefaultSettings(p)))
+                        program.SettingsUpdatedAt = startedAt;
+                    await db.SaveChangesAsync(token);
+                }
+            }
+
+            var settings = changed.Select(p => new CloudProgramSettings(
+                p.Identifier, p.Category, p.IsTracked, p.IsHidden, p.IgnoreIdle,
+                p.SettingsUpdatedAt ?? DateTime.UnixEpoch, deviceId)).ToList();
+            foreach (var batch in settings.Chunk(UploadBatchSize))
+                await cloud.UploadProgramsAsync(deviceId, batch, token);
+
+            await SetStateAsync(ProgramsUploadWatermarkKey, FormatDate(startedAt));
+            return changed.Count;
+        }
+
+        // Так програма виглядає, коли її щойно знайшов трекер
+        private static bool HasDefaultSettings(TrackedProgram program) =>
+            program.Category == "Суміжні" && program.IsTracked && !program.IsHidden && !program.IgnoreIdle;
+
+        private async Task<int> DownloadProgramsAsync(CloudStore cloud, Guid deviceId, CancellationToken token)
+        {
+            var watermark = ParseDate(await GetStateAsync(ProgramsDownloadWatermarkKey));
+            var since = watermark.HasValue ? DateTime.SpecifyKind(watermark.Value, DateTimeKind.Utc) - DownloadOverlap : (DateTime?)null;
+
+            var rows = await cloud.DownloadProgramsAsync(deviceId, since, token);
+            if (rows.Count == 0) return 0;
+
+            await ApplyRemoteProgramsAsync(rows.Select(r => r.Settings).ToList(), token);
+            await SetStateAsync(ProgramsDownloadWatermarkKey, FormatDate(rows.Max(r => r.SyncedAtUtc)));
+            return rows.Count;
+        }
+
+        // Налаштування з іншого пристрою застосовуються, якщо вони новіші за локальні
+        public async Task ApplyRemoteProgramsAsync(IReadOnlyCollection<CloudProgramSettings> programs, CancellationToken token = default)
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync(token);
+            var local = (await db.TrackedPrograms.ToListAsync(token))
+                .GroupBy(p => p.Identifier)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            foreach (var remote in programs)
+            {
+                if (!local.TryGetValue(remote.Identifier, out var program))
+                {
+                    program = new TrackedProgram { Name = remote.Identifier, Identifier = remote.Identifier };
+                    db.TrackedPrograms.Add(program);
+                    local[remote.Identifier] = program;
+                }
+                else if (program.SettingsUpdatedAt != null && program.SettingsUpdatedAt >= remote.UpdatedAtUtc)
+                {
+                    continue;
+                }
+
+                program.Category = remote.Category;
+                program.IsTracked = remote.IsTracked;
+                program.IsHidden = remote.IsHidden;
+                program.IgnoreIdle = remote.IgnoreIdle;
+                program.SettingsUpdatedAt = remote.UpdatedAtUtc;
+            }
+
+            await db.SaveChangesAsync(token);
+        }
+
+        public const int IconBatchSize = 50;
+
+        // Свої іконки, яких немає в хмарі, — туди; іконки програм, яких тут немає локально, — сюди
+        private async Task SyncIconsAsync(CloudStore cloud, CancellationToken token)
+        {
+            var inCloud = await cloud.GetIconIdentifiersAsync(token);
+
+            await using var db = await _dbFactory.CreateDbContextAsync(token);
+            var programs = await db.TrackedPrograms.ToListAsync(token);
+
+            var toUpload = programs
+                .Where(p => p.IconBytes is { Length: > 0 } && !inCloud.Contains(p.Identifier))
+                .GroupBy(p => p.Identifier)
+                .Select(g => (g.Key, g.First().IconBytes!))
+                .ToList();
+            foreach (var batch in toUpload.Chunk(IconBatchSize))
+                await cloud.UploadIconsAsync(batch, token);
+
+            var missing = programs
+                .Where(p => p.IconBytes is not { Length: > 0 } && inCloud.Contains(p.Identifier))
+                .ToList();
+            if (missing.Count == 0) return;
+
+            var icons = (await cloud.DownloadIconsAsync(missing.Select(p => p.Identifier).Distinct().ToList(), token))
+                .ToDictionary(i => i.Identifier, i => i.Icon);
+            foreach (var program in missing)
+            {
+                if (icons.TryGetValue(program.Identifier, out var icon))
+                    program.IconBytes = icon;
+            }
             await db.SaveChangesAsync(token);
         }
 

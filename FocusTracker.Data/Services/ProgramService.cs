@@ -24,8 +24,10 @@ namespace FocusTracker.Data.Services
             return await db.TrackedPrograms.AsNoTracking().ToListAsync();
         }
 
+        // Викликається, коли користувач змінює програму на сторінці «Застосунки»
         public async Task UpdateAsync(TrackedProgram program)
         {
+            program.SettingsUpdatedAt = DateTime.UtcNow;
             await using var db = await _dbFactory.CreateDbContextAsync();
             db.Entry(program).State = EntityState.Modified;
             await db.SaveChangesAsync();

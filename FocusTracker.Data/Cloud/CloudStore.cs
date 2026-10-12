@@ -8,6 +8,10 @@ namespace FocusTracker.Data.Cloud
 
     public record CloudDevice(Guid DeviceId, string Name, DateTime LastSeenAtUtc);
 
+    // Налаштування програми зі сторінки «Застосунки»; UpdatedAtUtc — коли їх змінив користувач
+    public record CloudProgramSettings(string Identifier, string Category, bool IsTracked, bool IsHidden,
+        bool IgnoreIdle, DateTime UpdatedAtUtc, Guid UpdatedBy);
+
     // Доступ до хмарної бази Postgres (Supabase). Таблиці з префіксом ft_ створюються самі.
     public class CloudStore
     {
@@ -30,9 +34,30 @@ namespace FocusTracker.Data.Cloud
                 primary key (device_id, app_name, date, hour)
             );
             create index if not exists ft_hourly_usage_updated_at on public.ft_hourly_usage (updated_at);
+            create table if not exists public.ft_programs (
+                identifier text primary key,
+                category text not null,
+                is_tracked boolean not null,
+                is_hidden boolean not null,
+                ignore_idle boolean not null,
+                updated_at timestamptz not null,
+                updated_by uuid not null,
+                synced_at timestamptz not null default now()
+            );
+            create index if not exists ft_programs_synced_at on public.ft_programs (synced_at);
+            create table if not exists public.ft_program_icons (
+                identifier text primary key,
+                icon bytea not null,
+                updated_at timestamptz not null default now()
+            );
+            alter table public.ft_program_icons enable row level security;
             alter table public.ft_devices enable row level security;
             alter table public.ft_hourly_usage enable row level security;
+            alter table public.ft_programs enable row level security;
             """;
+
+        // Змінюється, коли SchemaSql отримує нові таблиці: пристрої перевіряють схему заново
+        public const int SchemaVersion = 2;
 
         private readonly string _connectionString;
 
@@ -116,6 +141,115 @@ namespace FocusTracker.Data.Cloud
                     reader.GetDateTime(6)));
             }
             return rows;
+        }
+
+        // Перемагає новіша зміна: старіші налаштування не перезаписують хмарні
+        public async Task UploadProgramsAsync(Guid deviceId, IReadOnlyList<CloudProgramSettings> programs, CancellationToken token = default)
+        {
+            if (programs.Count == 0) return;
+
+            await using var connection = await OpenAsync(token);
+            await using var command = new NpgsqlCommand("""
+                insert into public.ft_programs (identifier, category, is_tracked, is_hidden, ignore_idle, updated_at, updated_by, synced_at)
+                select u.identifier, u.category, u.is_tracked, u.is_hidden, u.ignore_idle, u.updated_at, @device, now()
+                from unnest(@ids, @categories, @tracked, @hidden, @ignoreIdle, @updated)
+                    as u(identifier, category, is_tracked, is_hidden, ignore_idle, updated_at)
+                on conflict (identifier) do update
+                set category = excluded.category,
+                    is_tracked = excluded.is_tracked,
+                    is_hidden = excluded.is_hidden,
+                    ignore_idle = excluded.ignore_idle,
+                    updated_at = excluded.updated_at,
+                    updated_by = excluded.updated_by,
+                    synced_at = now()
+                where excluded.updated_at > public.ft_programs.updated_at;
+                """, connection);
+            command.Parameters.AddWithValue("device", deviceId);
+            command.Parameters.AddWithValue("ids", programs.Select(p => p.Identifier).ToArray());
+            command.Parameters.AddWithValue("categories", programs.Select(p => p.Category).ToArray());
+            command.Parameters.AddWithValue("tracked", programs.Select(p => p.IsTracked).ToArray());
+            command.Parameters.AddWithValue("hidden", programs.Select(p => p.IsHidden).ToArray());
+            command.Parameters.AddWithValue("ignoreIdle", programs.Select(p => p.IgnoreIdle).ToArray());
+            command.Parameters.Add(new NpgsqlParameter("updated", NpgsqlDbType.Array | NpgsqlDbType.TimestampTz)
+            {
+                Value = programs.Select(p => DateTime.SpecifyKind(p.UpdatedAtUtc, DateTimeKind.Utc)).ToArray()
+            });
+            await command.ExecuteNonQueryAsync(token);
+        }
+
+        // Налаштування, які інші пристрої записали після sinceUtc (час сервера)
+        public async Task<List<(CloudProgramSettings Settings, DateTime SyncedAtUtc)>> DownloadProgramsAsync(
+            Guid excludeDeviceId, DateTime? sinceUtc, CancellationToken token = default)
+        {
+            await using var connection = await OpenAsync(token);
+            await using var command = new NpgsqlCommand("""
+                select identifier, category, is_tracked, is_hidden, ignore_idle, updated_at, updated_by, synced_at
+                from public.ft_programs
+                where updated_by <> @me and (@since::timestamptz is null or synced_at > @since)
+                order by synced_at;
+                """, connection);
+            command.Parameters.AddWithValue("me", excludeDeviceId);
+            command.Parameters.Add(new NpgsqlParameter("since", NpgsqlDbType.TimestampTz) { Value = (object?)sinceUtc ?? DBNull.Value });
+
+            var rows = new List<(CloudProgramSettings, DateTime)>();
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+            {
+                rows.Add((new CloudProgramSettings(
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    reader.GetBoolean(2),
+                    reader.GetBoolean(3),
+                    reader.GetBoolean(4),
+                    reader.GetDateTime(5),
+                    reader.GetGuid(6)), reader.GetDateTime(7)));
+            }
+            return rows;
+        }
+
+        // Іконки беруться з exe, тож є лише на пристроях, де програма встановлена.
+        // У хмарі зберігаємо по одній іконці на програму і роздаємо тим, у кого її немає.
+        public async Task<HashSet<string>> GetIconIdentifiersAsync(CancellationToken token = default)
+        {
+            await using var connection = await OpenAsync(token);
+            await using var command = new NpgsqlCommand("select identifier from public.ft_program_icons;", connection);
+
+            var identifiers = new HashSet<string>(StringComparer.Ordinal);
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+                identifiers.Add(reader.GetString(0));
+            return identifiers;
+        }
+
+        public async Task UploadIconsAsync(IReadOnlyList<(string Identifier, byte[] Icon)> icons, CancellationToken token = default)
+        {
+            if (icons.Count == 0) return;
+
+            await using var connection = await OpenAsync(token);
+            await using var command = new NpgsqlCommand("""
+                insert into public.ft_program_icons (identifier, icon)
+                select u.identifier, u.icon from unnest(@ids, @icons) as u(identifier, icon)
+                on conflict (identifier) do nothing;
+                """, connection);
+            command.Parameters.AddWithValue("ids", icons.Select(i => i.Identifier).ToArray());
+            command.Parameters.Add(new NpgsqlParameter("icons", NpgsqlDbType.Array | NpgsqlDbType.Bytea) { Value = icons.Select(i => i.Icon).ToArray() });
+            await command.ExecuteNonQueryAsync(token);
+        }
+
+        public async Task<List<(string Identifier, byte[] Icon)>> DownloadIconsAsync(IReadOnlyCollection<string> identifiers, CancellationToken token = default)
+        {
+            var icons = new List<(string, byte[])>();
+            if (identifiers.Count == 0) return icons;
+
+            await using var connection = await OpenAsync(token);
+            await using var command = new NpgsqlCommand(
+                "select identifier, icon from public.ft_program_icons where identifier = any(@ids);", connection);
+            command.Parameters.AddWithValue("ids", identifiers.ToArray());
+
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+                icons.Add((reader.GetString(0), reader.GetFieldValue<byte[]>(1)));
+            return icons;
         }
 
         public async Task<List<CloudDevice>> GetDevicesAsync(CancellationToken token = default)

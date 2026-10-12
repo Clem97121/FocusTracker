@@ -69,6 +69,10 @@ public class TrackedProgram : ObservableObject
         set => Set(ref _lastUsed, value);
     }
 
+    // Коли користувач востаннє змінював налаштування програми (UTC). Для синхронізації між
+    // пристроями: перемагає новіша зміна. null — налаштування ще не змінювались.
+    public DateTime? SettingsUpdatedAt { get; set; }
+
     private TimeSpan? _totalUsageTime;
     public TimeSpan? TotalUsageTime
     {

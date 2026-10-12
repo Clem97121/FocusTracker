@@ -361,6 +361,9 @@ namespace FocusTracker.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("SettingsUpdatedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<TimeSpan?>("TotalUsageTime")
                         .HasColumnType("TEXT");
 

@@ -84,6 +84,43 @@ public class CloudSyncTests
     }
 
     [Fact]
+    public async Task Newer_program_settings_from_other_device_win()
+    {
+        using var db = new TestDb();
+        var programs = new TrackedProgramService(db);
+        programs.Add(new TrackedProgram { Name = "steam", Identifier = "steam", Category = "Суміжні", IsTracked = true });
+        var sync = new CloudSyncService(db);
+        var now = DateTime.UtcNow;
+
+        // Нічого не змінювалось локально — беремо налаштування з хмари; нова програма додається
+        await sync.ApplyRemoteProgramsAsync(new[]
+        {
+            new CloudProgramSettings("steam", "Непродуктивні", true, true, false, now.AddMinutes(-10), Laptop),
+            new CloudProgramSettings("vlc", "Суміжні", true, false, true, now.AddMinutes(-10), Laptop)
+        });
+        var steam = programs.GetAll().Single(p => p.Identifier == "steam");
+        Assert.Equal("Непродуктивні", steam.Category);
+        Assert.True(steam.IsHidden);
+        Assert.True(programs.GetAll().Single(p => p.Identifier == "vlc").IgnoreIdle);
+
+        // Користувач змінив категорію тут — старіша хмарна зміна її не перетирає
+        steam.Category = "Продуктивні";
+        await new ProgramService(db, programs).UpdateAsync(steam);
+        await sync.ApplyRemoteProgramsAsync(new[]
+        {
+            new CloudProgramSettings("steam", "Непродуктивні", true, false, false, now.AddMinutes(-5), Laptop)
+        });
+        Assert.Equal("Продуктивні", programs.GetAll().Single(p => p.Identifier == "steam").Category);
+
+        // А новіша — перетирає
+        await sync.ApplyRemoteProgramsAsync(new[]
+        {
+            new CloudProgramSettings("steam", "Суміжні", true, false, false, DateTime.UtcNow.AddMinutes(1), Laptop)
+        });
+        Assert.Equal("Суміжні", programs.GetAll().Single(p => p.Identifier == "steam").Category);
+    }
+
+    [Fact]
     public async Task Local_usage_marks_rows_as_changed()
     {
         using var db = new TestDb();
