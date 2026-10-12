@@ -52,12 +52,20 @@ Usage statistics of all devices can be shared through a Supabase (Postgres) data
 2. In FocusTracker open «Налаштування» → «Синхронізація між пристроями», set the device name,
    paste the connection string, tick «Синхронізувати» and press «Зберегти».
 
-On the first sync the app creates the `ft_devices` and `ft_hourly_usage` tables (Row Level
-Security enabled, so they are not exposed through the Supabase Data API). Every minute it
-uploads hourly rows changed on this device and downloads rows of the other devices into the
-local `RemoteHourlyUsages` table, so statistics also work offline. The statistics page gets a
-device selector; daily limits count the time of all devices. Tasks, skills, restrictions and
-program categories stay per device.
+On the first sync the app creates its `ft_*` tables (Row Level Security enabled, so they are
+not exposed through the Supabase Data API). Every minute it:
+
+- uploads hourly usage rows changed on this device and downloads rows of the other devices
+  into the local `RemoteHourlyUsages` table, so statistics also work offline. The statistics
+  page gets a device selector; daily limits count the time of all devices;
+- syncs program settings (category, tracked, hidden, ignore idle) in `ft_programs` and program
+  icons in `ft_program_icons`;
+- syncs skill categories, skills, tasks (with their programs), restrictions and XP history as
+  JSON documents in `ft_entities`, including deletions.
+
+Conflicts are resolved per item: the most recent change wins. Task progress (`TaskProgramUsages`)
+is counted on the device where the task is worked on. If the same skill gets XP on two devices
+while one of them is offline, only the later change is kept.
 
 The connection string is stored in `settings.json` encrypted with Windows DPAPI for the current
 user.
