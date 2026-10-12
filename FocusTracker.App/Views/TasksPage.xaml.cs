@@ -22,7 +22,8 @@ namespace FocusTracker.App.Views
             var skillService = App.Services.GetRequiredService<ISkillService>();
             var programService = App.Services.GetRequiredService<ITrackedProgramService>();
             var taskProgramService = App.Services.GetRequiredService<ITaskProgramService>();
-            var usageStatService = App.Services.GetRequiredService<IAppUsageStatService>();
+            // Завдання рахуються лише на цьому пристрої, тож беремо локальну статистику без інших пристроїв
+            var usageStatService = App.Services.GetRequiredService<FocusTracker.Data.Services.AppUsageStatService>();
             var taskProgramUsageService = App.Services.GetRequiredService<ITaskProgramUsageService>();
             var taskCompletionService = App.Services.GetRequiredService<ITaskCompletionService>();
 

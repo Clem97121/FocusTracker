@@ -69,6 +69,12 @@ namespace FocusTracker.Data.Services
 
                                     if (stat != null)
                                         totalSeconds += stat.TotalTime.TotalSeconds;
+
+                                    // Ліміт рахується за сумою всіх пристроїв
+                                    totalSeconds += db.RemoteHourlyUsages
+                                        .Where(r => r.AppName == programIdentifier && r.Date == now.Date)
+                                        .AsEnumerable()
+                                        .Sum(r => r.TotalTime.TotalSeconds);
                                 }
 
                                 if ((totalSeconds / 60.0) > maxMinutes)

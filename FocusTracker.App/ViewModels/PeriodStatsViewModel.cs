@@ -1,4 +1,7 @@
-﻿using FocusTracker.Domain.Interfaces;
+﻿using FocusTracker.Data;
+using FocusTracker.Data.Cloud;
+using FocusTracker.Domain;
+using FocusTracker.Domain.Interfaces;
 using FocusTracker.Domain.Models;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
@@ -93,6 +96,59 @@ namespace FocusTracker.App.ViewModels
         {
             LoadMinDate(); // 👈 сначала определим минимум
             LoadDataForDate(_selectedDate);
+            LoadDevices();
+        }
+
+        // Вибір пристрою: усі, цей або один з інших (з'являються після синхронізації)
+        public record DeviceOption(string Name, StatsScopeKind Kind, Guid DeviceId);
+
+        public ObservableCollection<DeviceOption> Devices { get; } = new();
+
+        public bool HasRemoteDevices => Devices.Count > 2;
+
+        private DeviceOption? _selectedDevice;
+        public DeviceOption? SelectedDevice
+        {
+            get => _selectedDevice;
+            set
+            {
+                if (value == null || _selectedDevice == value) return;
+                _selectedDevice = value;
+                OnPropertyChanged();
+
+                var scope = App.Services.GetRequiredService<StatsScope>();
+                switch (value.Kind)
+                {
+                    case StatsScopeKind.ThisDevice: scope.SetThisDevice(); break;
+                    case StatsScopeKind.RemoteDevice: scope.SetRemoteDevice(value.DeviceId); break;
+                    default: scope.SetAllDevices(); break;
+                }
+
+                LoadMinDate();
+                if (IsRangeMode)
+                    LoadDataForRange();
+                else
+                    LoadDataForDate(SelectedDate);
+            }
+        }
+
+        private async void LoadDevices()
+        {
+            var settings = App.Services.GetRequiredService<SettingsStore>().Current;
+            var remote = await App.Services.GetRequiredService<CloudSyncService>().GetRemoteDevicesAsync();
+
+            Devices.Add(new DeviceOption("Усі пристрої", StatsScopeKind.AllDevices, Guid.Empty));
+            Devices.Add(new DeviceOption($"Цей пристрій ({settings.DeviceName})", StatsScopeKind.ThisDevice, Guid.Empty));
+            foreach (var device in remote)
+                Devices.Add(new DeviceOption(device.Name, StatsScopeKind.RemoteDevice, device.DeviceId));
+
+            // Вибір зберігається між відкриттями сторінки, бо StatsScope один на застосунок
+            var scope = App.Services.GetRequiredService<StatsScope>();
+            _selectedDevice = Devices.FirstOrDefault(d => d.Kind == scope.Kind
+                    && (d.Kind != StatsScopeKind.RemoteDevice || d.DeviceId == scope.RemoteDeviceId))
+                ?? Devices[0];
+            OnPropertyChanged(nameof(SelectedDevice));
+            OnPropertyChanged(nameof(HasRemoteDevices));
         }
         private DateTime _minDate = DateTime.Today;
         public DateTime MinDate

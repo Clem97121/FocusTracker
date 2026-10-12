@@ -15,6 +15,16 @@
                        Foreground="White"
                        Margin="0 0 0 10"/>
 
+            <!-- Пристрій (лише коли є інші пристрої з хмари) -->
+            <ComboBox ItemsSource="{Binding Devices}"
+                      SelectedItem="{Binding SelectedDevice, Mode=TwoWay}"
+                      DisplayMemberPath="Name"
+                      Width="250"
+                      HorizontalAlignment="Left"
+                      Margin="0 0 0 10"
+                      Style="{StaticResource CustomComboBox}"
+                      Visibility="{Binding HasRemoteDevices, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
             <!-- Тумблер -->
             <StackPanel Orientation="Horizontal" Margin="0 0 0 10" VerticalAlignment="Center">
                 <TextBlock Text="Один день"

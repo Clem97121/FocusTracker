@@ -56,7 +56,8 @@ namespace FocusTracker.Data.Services
                     Date = today,
                     Hour = hour,
                     TotalTime = totalTime,
-                    ActiveTime = activeTime
+                    ActiveTime = activeTime,
+                    UpdatedAt = now
                 };
                 db.HourlyAppUsageLogs.Add(hourly);
             }
@@ -64,6 +65,7 @@ namespace FocusTracker.Data.Services
             {
                 hourly.TotalTime += totalTime;
                 hourly.ActiveTime += activeTime;
+                hourly.UpdatedAt = now;
             }
 
             if (stat == null)
@@ -129,6 +131,12 @@ namespace FocusTracker.Data.Services
             var programCategories = await db.TrackedPrograms
                 .ToDictionaryAsync(p => p.Identifier, p => p.Category);
 
+            return BuildHourlyCategoryStats(usageLogs, programCategories);
+        }
+
+        public static List<HourlyCategoryStat> BuildHourlyCategoryStats(
+            IEnumerable<HourlyAppUsageLog> usageLogs, IReadOnlyDictionary<string, string> programCategories)
+        {
             var grouped = usageLogs
                 .GroupBy(log => log.Hour)
                 .Select(group =>
