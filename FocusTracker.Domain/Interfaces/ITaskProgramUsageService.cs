@@ -6,7 +6,7 @@ namespace FocusTracker.Domain.Interfaces
     {
         List<TaskProgramUsage> GetByTaskId(int taskId);
         void AddOrUpdate(TaskProgramUsage usage);
-        // 👇 добавь вот эту строку:
         List<TaskProgramUsage> GetAll();
+        void Delete(int taskId, int programId);
     }
 }

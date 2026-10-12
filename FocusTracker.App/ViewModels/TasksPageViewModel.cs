@@ -21,6 +21,7 @@ namespace FocusTracker.App.ViewModels
         private readonly ITaskProgramService _taskProgramService;
         private readonly IAppUsageStatService _appUsageStatService;
         private readonly ITaskProgramUsageService _taskProgramUsageService;
+        private readonly ITaskCompletionService _taskCompletionService;
 
         public ObservableCollection<TaskItem> Tasks { get; set; } = new();
         public ObservableCollection<Skill> AvailableSkills { get; set; } = new();
@@ -97,14 +98,20 @@ namespace FocusTracker.App.ViewModels
             set { _historyFilterProgram = value; OnPropertyChanged(); UpdateFilteredHistory(); }
         }
 
-        public bool NewTaskIsPassive { get; set; }
+        private bool _newTaskIsPassive;
+        public bool NewTaskIsPassive
+        {
+            get => _newTaskIsPassive;
+            set { _newTaskIsPassive = value; OnPropertyChanged(); }
+        }
         public TasksPageViewModel(
             ITaskItemService taskService,
             ISkillService skillService,
             ITrackedProgramService programService,
             ITaskProgramService taskProgramService,
             IAppUsageStatService appUsageStatService,
-            ITaskProgramUsageService taskProgramUsageService)
+            ITaskProgramUsageService taskProgramUsageService,
+            ITaskCompletionService taskCompletionService)
         {
             _taskService = taskService;
             _skillService = skillService;
@@ -112,6 +119,7 @@ namespace FocusTracker.App.ViewModels
             _taskProgramService = taskProgramService;
             _appUsageStatService = appUsageStatService;
             _taskProgramUsageService = taskProgramUsageService;
+            _taskCompletionService = taskCompletionService;
 
             LoadSkills();
             LoadPrograms();
@@ -171,30 +179,36 @@ namespace FocusTracker.App.ViewModels
             };
 
             var savedTask = _taskService.Add(task);
-            // Task.Run: .Result на UI-потоці без нього може зависнути
-            var todayStats = Task.Run(() => _appUsageStatService.GetStatsForTodayAsync()).GetAwaiter().GetResult();
-
+            var todayStats = GetTodayStats();
             foreach (var program in SelectedPrograms)
             {
                 _taskProgramService.Add(new TaskProgram { TaskId = savedTask.Id, ProgramId = program.Id });
-
-                var stat = todayStats.FirstOrDefault(s => s.AppName == program.Identifier);
-                int initialActive = (int)(stat?.ActiveTime.TotalSeconds ?? 0);
-                int initialPassive = (int)(stat?.TotalTime.TotalSeconds ?? 0);
-
-                _taskProgramUsageService.AddOrUpdate(new TaskProgramUsage
-                {
-                    TaskId = savedTask.Id,
-                    ProgramId = program.Id,
-                    CountedActiveSeconds = 0,
-                    CountedPassiveSeconds = 0,
-                    InitialActiveSeconds = initialActive,
-                    InitialPassiveSeconds = initialPassive
-                });
+                AddBaseline(savedTask.Id, program, todayStats);
             }
 
             ResetForm();
             LoadTasks();
+        }
+
+        private List<AppUsageStat> GetTodayStats() =>
+            // Task.Run: .Result на UI-потоці без нього може зависнути
+            Task.Run(() => _appUsageStatService.GetStatsForTodayAsync()).GetAwaiter().GetResult();
+
+        // Запам'ятовує, скільки часу в програмі вже було сьогодні на момент прив'язки до задачі,
+        // щоб при завершенні рахувати лише приріст
+        private void AddBaseline(int taskId, TrackedProgram program, List<AppUsageStat> todayStats)
+        {
+            var stat = todayStats.FirstOrDefault(s => s.AppName == program.Identifier);
+            _taskProgramUsageService.AddOrUpdate(new TaskProgramUsage
+            {
+                TaskId = taskId,
+                ProgramId = program.Id,
+                CountedActiveSeconds = 0,
+                CountedPassiveSeconds = 0,
+                InitialActiveSeconds = (int)(stat?.ActiveTime.TotalSeconds ?? 0),
+                InitialPassiveSeconds = (int)(stat?.TotalTime.TotalSeconds ?? 0),
+                BaselineDate = DateTime.Today
+            });
         }
 
         public void EditTask(TaskItem task)
@@ -206,6 +220,7 @@ namespace FocusTracker.App.ViewModels
             SelectedSkill = AvailableSkills.FirstOrDefault(s => s.Id == task.SkillId);
             NewTaskDifficulty = task.Difficulty;
             NewTaskEstimatedMinutes = task.EstimatedMinutes;
+            NewTaskIsPassive = task.IsPassive;
             SelectedPrograms.Clear();
             foreach (var p in task.Programs)
                 SelectedPrograms.Add(p);
@@ -221,11 +236,29 @@ namespace FocusTracker.App.ViewModels
             _editingTask.SkillId = SelectedSkill?.Id ?? _editingTask.SkillId;
             _editingTask.Difficulty = NewTaskDifficulty;
             _editingTask.EstimatedMinutes = NewTaskEstimatedMinutes;
+            _editingTask.IsPassive = NewTaskIsPassive;
 
             _taskService.Update(_editingTask);
+
+            var oldProgramIds = _taskProgramService.GetByTaskId(_editingTask.Id).Select(tp => tp.ProgramId).ToHashSet();
+            var newProgramIds = SelectedPrograms.Select(p => p.Id).ToHashSet();
+
+            // Прибрані програми: видаляємо і зв'язок, і базову точку
+            foreach (var programId in oldProgramIds.Except(newProgramIds))
+                _taskProgramUsageService.Delete(_editingTask.Id, programId);
+
             _taskProgramService.DeleteByTaskId(_editingTask.Id);
             foreach (var program in SelectedPrograms)
                 _taskProgramService.Add(new TaskProgram { TaskId = _editingTask.Id, ProgramId = program.Id });
+
+            // Нові програми рахуються з моменту додавання, а не за весь день
+            var addedPrograms = SelectedPrograms.Where(p => !oldProgramIds.Contains(p.Id)).ToList();
+            if (addedPrograms.Count > 0)
+            {
+                var todayStats = GetTodayStats();
+                foreach (var program in addedPrograms)
+                    AddBaseline(_editingTask.Id, program, todayStats);
+            }
 
             ResetForm();
             LoadTasks();
@@ -241,153 +274,15 @@ namespace FocusTracker.App.ViewModels
         public void CancelTaskEdit() => ResetForm();
         public void StartNewTask() => ResetForm();
 
-        public async Task<int> CompleteTask(TaskItem task)
+        public Task<int> CompleteTask(TaskItem task)
         {
-            if (task.Completed) return 0;
+            if (task.Completed) return Task.FromResult(0);
 
-            var today = DateTime.Today;
-            var now = DateTime.Now;
-
-            var statsList = (await _appUsageStatService.GetStatsForDayAsync(today)).ToList();
-            var allUsage = _taskProgramUsageService.GetAll();
-            var allPrograms = _programService.GetAll().ToList();
-            var allTasks = _taskService.GetAll();
-
-            DateTime taskCreated = task.DateCreated;
-
-            int totalNewActiveSeconds = 0;
-            int totalPassiveSeconds = 0;
-
-            foreach (var program in task.Programs.ToList())
-            {
-                var stat = statsList.FirstOrDefault(s => s.AppName == program.Identifier);
-                if (stat == null) continue;
-
-                var usage = allUsage.FirstOrDefault(u => u.TaskId == task.Id && u.ProgramId == program.Id);
-
-                if (task.IsPassive)
-                {
-                    int totalPassive = (int)stat.TotalTime.TotalSeconds;
-                    int initialPassive = usage?.InitialPassiveSeconds ?? 0;
-
-                    int laterUsedPassive = allUsage
-                        .Where(u => u.ProgramId == program.Id
-                                 && u.IsFinalized
-                                 && u.RecordedAt.HasValue
-                                 && u.RecordedAt > taskCreated)
-                        .Sum(u => u.CountedPassiveSeconds);
-
-                    int effectiveBasePassive = initialPassive + laterUsedPassive;
-                    int newPassiveSeconds = totalPassive - effectiveBasePassive;
-
-                    Debug.WriteLine("▶️ ПРОГРАММА (пасив): " + program.Identifier);
-                    Debug.WriteLine($"  Загальна пасивна тривалість: {totalPassive} сек");
-                    Debug.WriteLine($"  InitialPassiveSeconds: {initialPassive} сек");
-                    Debug.WriteLine($"  Вже використано в інших задачах: {laterUsedPassive} сек");
-                    Debug.WriteLine($"  effectiveBasePassive: {effectiveBasePassive} сек");
-                    Debug.WriteLine($"  newPassiveSeconds: {newPassiveSeconds} сек");
-
-                    if (newPassiveSeconds <= 0)
-                    {
-                        Debug.WriteLine("  ⚠️ Нових пасивних секунд нема, XP не буде");
-                        continue;
-                    }
-
-                    Debug.WriteLine("  ✅ Пасивне XP буде нараховано");
-
-                    totalPassiveSeconds += newPassiveSeconds;
-
-                    _taskProgramUsageService.AddOrUpdate(new TaskProgramUsage
-                    {
-                        TaskId = task.Id,
-                        ProgramId = program.Id,
-                        CountedActiveSeconds = 0,
-                        CountedPassiveSeconds = newPassiveSeconds,
-                        InitialActiveSeconds = 0,
-                        InitialPassiveSeconds = initialPassive,
-                        RecordedAt = now,
-                        IsFinalized = true
-                    });
-
-                    continue;
-                }
-
-                int totalActive = (int)stat.ActiveTime.TotalSeconds;
-                int initialActive = usage?.InitialActiveSeconds ?? 0;
-
-                int laterUsed = allUsage
-                    .Where(u => u.ProgramId == program.Id
-                             && u.IsFinalized
-                             && u.RecordedAt.HasValue
-                             && u.RecordedAt > taskCreated)
-                    .Sum(u => u.CountedActiveSeconds);
-
-                int effectiveBase = initialActive + laterUsed;
-                int newActiveSeconds = totalActive - effectiveBase;
-
-                Debug.WriteLine("▶️ ПРОГРАММА: " + program.Identifier);
-                Debug.WriteLine($"  Задача: #{task.Id} — {task.Title}");
-                Debug.WriteLine($"  Дата створення задачі: {taskCreated:yyyy-MM-dd HH:mm:ss}");
-                Debug.WriteLine($"  Активне час общее: {totalActive} сек");
-                Debug.WriteLine($"  InitialActiveSeconds: {initialActive} сек");
-                Debug.WriteLine($"  already used в других задачах (после этой): {laterUsed} сек");
-                Debug.WriteLine($"  effectiveBase (initial + laterUsed): {effectiveBase} сек");
-                Debug.WriteLine($"  newActiveSeconds: {newActiveSeconds} сек");
-
-                if (newActiveSeconds <= 0)
-                {
-                    Debug.WriteLine("  ⚠️ Новых секунд нет, начисление пропущено");
-                    continue;
-                }
-
-                Debug.WriteLine("  ✅ Начисление ОК, XP будет засчитан");
-
-                totalNewActiveSeconds += newActiveSeconds;
-
-                _taskProgramUsageService.AddOrUpdate(new TaskProgramUsage
-                {
-                    TaskId = task.Id,
-                    ProgramId = program.Id,
-                    CountedActiveSeconds = newActiveSeconds,
-                    CountedPassiveSeconds = 0,
-                    InitialActiveSeconds = initialActive,
-                    InitialPassiveSeconds = 0,
-                    RecordedAt = now,
-                    IsFinalized = true
-                });
-            }
-
-            int finalSeconds = task.IsPassive ? totalPassiveSeconds : totalNewActiveSeconds;
-
-            if (finalSeconds > 0)
-            {
-                int earnedXp = finalSeconds * task.Difficulty;
-                _skillService.AddXp(task.SkillId, earnedXp);
-
-                task.Completed = true;
-                task.EarnedXp = earnedXp;
-                task.ActiveSeconds = finalSeconds;
-                _taskService.Update(task);
-
-                using var db = App.Services.GetRequiredService<IDbContextFactory<FocusTrackerDbContext>>().CreateDbContext();
-                db.ExperienceHistories.Add(new ExperienceHistory
-                {
-                    TaskId = task.Id,
-                    XpEarned = earnedXp,
-                    RecordedAt = now.ToString("s")
-                });
-                db.SaveChanges();
-
-                LoadTasks();
-                LoadCompletedTasks();
-
-                return earnedXp;
-            }
-
-            return 0;
+            int earnedXp = _taskCompletionService.Complete(task.Id);
+            LoadTasks();
+            LoadCompletedTasks();
+            return Task.FromResult(earnedXp);
         }
-
-
 
         private void ResetForm()
         {
@@ -397,6 +292,7 @@ namespace FocusTracker.App.ViewModels
             SelectedPrograms.Clear();
             NewTaskDifficulty = 1;
             NewTaskEstimatedMinutes = 30;
+            NewTaskIsPassive = false;
             IsEditing = false;
             _editingTask = null;
             OnPropertyChanged(nameof(AddButtonText));

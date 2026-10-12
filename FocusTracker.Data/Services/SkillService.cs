@@ -1,4 +1,4 @@
-using FocusTracker.Domain.Interfaces;
+﻿using FocusTracker.Domain.Interfaces;
 using FocusTracker.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -78,9 +78,6 @@ public class SkillService : ISkillService
         db.SaveChanges();
     }
 
-    private int GetXpForNextLevel(int level)
-    {
-        // Наприклад: кожен новий рівень вимагає 100 * рівень XP
-        return 100 * level;
-    }
+    // Кожен новий рівень вимагає 100 * рівень XP (та сама формула, що й Skill.XpToNextLevel)
+    private int GetXpForNextLevel(int level) => Skill.XpForLevel(level);
 }

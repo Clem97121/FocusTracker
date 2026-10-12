@@ -45,6 +45,9 @@ namespace FocusTracker.Data.Services
                 db.TrackedPrograms.Add(tracked);
             }
 
+            if (totalTime > TimeSpan.Zero)
+                tracked.LastUsed = now;
+
             if (hourly == null)
             {
                 hourly = new HourlyAppUsageLog

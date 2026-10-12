@@ -217,6 +217,9 @@ namespace FocusTracker.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime?>("BaselineDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("CountedActiveSeconds")
                         .HasColumnType("INTEGER");
 

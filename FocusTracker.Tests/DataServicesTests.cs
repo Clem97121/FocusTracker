@@ -116,7 +116,8 @@ public class DataServicesTests
         var today = Assert.Single(await stats.GetStatsForTodayAsync());
         Assert.Equal(TimeSpan.FromSeconds(10), today.TotalTime);
         Assert.Equal(TimeSpan.FromSeconds(5), today.ActiveTime);
-        Assert.Single(new TrackedProgramService(db).GetAll());
+        var program = Assert.Single(new TrackedProgramService(db).GetAll());
+        Assert.NotNull(program.LastUsed);
     }
 
     [Fact]

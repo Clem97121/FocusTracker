@@ -12,6 +12,10 @@
         public int InitialPassiveSeconds { get; set; }
         public int CountedPassiveSeconds { get; set; } // 🆕 нове поле
 
+        // День, до якого відносяться Initial*Seconds (денна статистика на момент прив'язки).
+        // null у старих записах: тоді береться дата створення задачі.
+        public DateTime? BaselineDate { get; set; }
+
         public DateTime? RecordedAt { get; set; }
         public bool IsFinalized { get; set; }
 
