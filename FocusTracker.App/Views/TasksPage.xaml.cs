@@ -24,6 +24,7 @@ namespace FocusTracker.App.Views
             var taskProgramService = App.Services.GetRequiredService<ITaskProgramService>();
             var usageStatService = App.Services.GetRequiredService<IAppUsageStatService>();
             var taskProgramUsageService = App.Services.GetRequiredService<ITaskProgramUsageService>();
+            var taskCompletionService = App.Services.GetRequiredService<ITaskCompletionService>();
 
             // Передаємо сервіси до ViewModel
             ViewModel = new TasksPageViewModel(
@@ -32,7 +33,8 @@ namespace FocusTracker.App.Views
                 programService,
                 taskProgramService,
                 usageStatService,
-                taskProgramUsageService
+                taskProgramUsageService,
+                taskCompletionService
             );
 
             DataContext = ViewModel;

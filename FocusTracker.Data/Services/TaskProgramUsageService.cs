@@ -1,4 +1,4 @@
-using FocusTracker.Domain.Interfaces;
+﻿using FocusTracker.Domain.Interfaces;
 using FocusTracker.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,6 +38,9 @@ namespace FocusTracker.Data.Services
                 if (usage.RecordedAt.HasValue)
                     existing.RecordedAt = usage.RecordedAt;
 
+                if (usage.BaselineDate.HasValue)
+                    existing.BaselineDate = usage.BaselineDate;
+
                 existing.IsFinalized = usage.IsFinalized;
             }
             else
@@ -52,6 +55,14 @@ namespace FocusTracker.Data.Services
         {
             using var db = _dbFactory.CreateDbContext();
             return db.TaskProgramUsages.AsNoTracking().ToList();
+        }
+
+        public void Delete(int taskId, int programId)
+        {
+            using var db = _dbFactory.CreateDbContext();
+            var items = db.TaskProgramUsages.Where(u => u.TaskId == taskId && u.ProgramId == programId).ToList();
+            db.TaskProgramUsages.RemoveRange(items);
+            db.SaveChanges();
         }
     }
 }

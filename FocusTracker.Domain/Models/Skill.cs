@@ -37,7 +37,10 @@ public class Skill : ObservableObject
     }
 
     [NotMapped]
-    public int XpToNextLevel => (Level + 1) * 100;
+    public int XpToNextLevel => XpForLevel(Level);
+
+    // XP, потрібне, щоб перейти з рівня level на наступний
+    public static int XpForLevel(int level) => 100 * Math.Max(level, 1);
 
     [NotMapped]
     public double XpProgressPercent => XpToNextLevel == 0 ? 0 : (double)Xp / XpToNextLevel * 100;

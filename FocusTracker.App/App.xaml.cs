@@ -205,7 +205,7 @@ namespace FocusTracker.App
                 {
                     AppLog.Error("Помилка імпульсного нагадування", ex);
                 }
-            }, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
+            }, null, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10));
 
             _userActivity = new UserActivityTracker();
             _userActivity.Start();
@@ -221,7 +221,7 @@ namespace FocusTracker.App
             _windowTracker = new ActiveWindowTracker(
                 (appName, totalTime) =>
                 {
-                    var activeTime = userActivity.GetAndResetActiveTime();
+                    var activeTime = userActivity.GetActivePart(totalTime);
                     usageRecorder.Add(appName, totalTime, activeTime);
                 },
                 programServiceForTracker,
@@ -317,6 +317,7 @@ namespace FocusTracker.App
             services.AddSingleton<ITaskItemService, TaskItemService>();
             services.AddSingleton<ITaskProgramService, TaskProgramService>();
             services.AddSingleton<ITaskProgramUsageService, TaskProgramUsageService>();
+            services.AddSingleton<ITaskCompletionService, TaskCompletionService>();
             services.AddSingleton<ITrackedProgramService, TrackedProgramService>();
             services.AddSingleton<IRestrictionService, RestrictionService>();
             services.AddSingleton<IRestrictionNotificationService, RestrictionNotificationService>();
