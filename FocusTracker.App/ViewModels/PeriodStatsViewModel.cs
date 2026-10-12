@@ -100,7 +100,11 @@ namespace FocusTracker.App.ViewModels
         }
 
         // Вибір пристрою: усі, цей або один з інших (з'являються після синхронізації)
-        public record DeviceOption(string Name, StatsScopeKind Kind, Guid DeviceId);
+        public record DeviceOption(string Name, StatsScopeKind Kind, Guid DeviceId)
+        {
+            // Стиль CustomComboBox показує вибраний елемент через ToString, а не DisplayMemberPath
+            public override string ToString() => Name;
+        }
 
         public ObservableCollection<DeviceOption> Devices { get; } = new();
 
