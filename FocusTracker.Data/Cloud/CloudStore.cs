@@ -16,7 +16,7 @@ namespace FocusTracker.Data.Cloud
         bool IgnoreIdle, DateTime UpdatedAtUtc, Guid UpdatedBy);
 
     // Доступ до хмарної бази Postgres (Supabase). Таблиці з префіксом ft_ створюються самі.
-    public class CloudStore
+    public partial class CloudStore
     {
         // Row Level Security увімкнено: таблиці закриті для публічного REST API,
         // а пряме підключення власником бази на нього не зважає
@@ -78,10 +78,72 @@ namespace FocusTracker.Data.Cloud
             alter table public.ft_devices enable row level security;
             alter table public.ft_hourly_usage enable row level security;
             alter table public.ft_programs enable row level security;
+
+            -- Асистент у хмарі: налаштування, присутність, активність, чат і стан
+            create table if not exists public.ft_assistant_settings (
+                id integer primary key check (id = 1),
+                data jsonb not null,
+                updated_at timestamptz not null default now()
+            );
+            alter table public.ft_assistant_settings enable row level security;
+            create table if not exists public.ft_presence (
+                device_id uuid primary key,
+                name text not null,
+                last_input_at timestamptz,
+                foreground_app text,
+                updated_at timestamptz not null default now()
+            );
+            alter table public.ft_presence enable row level security;
+            create table if not exists public.ft_recent_activity (
+                id bigserial primary key,
+                device_id uuid not null,
+                at timestamptz not null,
+                seconds double precision not null default 0,
+                app text not null,
+                title text not null,
+                unique (device_id, at, app)
+            );
+            create index if not exists ft_recent_activity_at on public.ft_recent_activity (at);
+            alter table public.ft_recent_activity enable row level security;
+            create table if not exists public.ft_assistant_messages (
+                id bigserial primary key,
+                created_at timestamptz not null default now(),
+                role text not null check (role in ('user', 'assistant')),
+                kind text not null default 'chat' check (kind in ('chat', 'nudge', 'ask', 'plan', 'focus', 'review')),
+                text text not null,
+                device_id uuid,
+                target_device_id uuid,
+                status text not null default 'done' check (status in ('pending', 'done', 'error')),
+                error text
+            );
+            create index if not exists ft_assistant_messages_pending on public.ft_assistant_messages (id) where status = 'pending';
+            alter table public.ft_assistant_messages enable row level security;
+            create table if not exists public.ft_focus (
+                id integer primary key check (id = 1),
+                until timestamptz,
+                reason text not null default '',
+                apps text[] not null default '{}',
+                updated_at timestamptz not null default now()
+            );
+            insert into public.ft_focus (id) values (1) on conflict (id) do nothing;
+            alter table public.ft_focus enable row level security;
+            create table if not exists public.ft_assistant_state (
+                id integer primary key check (id = 1),
+                last_check_at timestamptz,
+                plan_date date,
+                review_date date,
+                memory text not null default '',
+                last_error text,
+                last_run_at timestamptz,
+                busy_until timestamptz,
+                cron_secret uuid not null default gen_random_uuid()
+            );
+            insert into public.ft_assistant_state (id) values (1) on conflict (id) do nothing;
+            alter table public.ft_assistant_state enable row level security;
             """;
 
         // Змінюється, коли SchemaSql отримує нові таблиці: пристрої перевіряють схему заново
-        public const int SchemaVersion = 4;
+        public const int SchemaVersion = 5;
 
         private readonly string _connectionString;
 

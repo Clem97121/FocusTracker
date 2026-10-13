@@ -90,17 +90,17 @@
                        TextWrapping="Wrap"
                        Margin="0 10 0 0"/>
 
-            <TextBlock Text="Джарвіс"
+            <TextBlock x:Name="AssistantHeader"
                        FontSize="18"
                        FontWeight="Bold"
                        Foreground="White"
                        Margin="0 40 0 10"/>
 
             <TextBlock Foreground="Gray" FontSize="13" TextWrapping="Wrap" Margin="0 0 0 15"
-                       Text="Асистент продуктивності на базі Claude. У продуктивні години раз на кілька хвилин дивиться, що ви робите (програми й заголовки вікон за останню годину, статистика всіх пристроїв, задачі), порівнює з цілями й за потреби нагадує, пропонує план або вмикає фокус-режим. Ці дані надсилаються в Anthropic; заголовки вікон більше нікуди не зберігаються."/>
+                       Text="Асистент продуктивності на базі Claude. У продуктивні години раз на кілька хвилин дивиться, що ви робите (програми й заголовки вікон за останню годину, статистика всіх пристроїв, задачі), порівнює з цілями й за потреби нагадує, пропонує план або вмикає фокус-режим. Ці дані надсилаються в Anthropic; заголовки вікон зберігаються лише в режимі «Мозок у хмарі» — у вашій базі Supabase, 3 години."/>
 
             <CheckBox x:Name="JarvisEnabledBox"
-                      Content="Увімкнути Джарвіса"
+                      Content="Увімкнути асистента"
                       Style="{StaticResource LeftAlignedCheckBox}"
                       Margin="0 0 0 10"/>
 
@@ -137,7 +137,7 @@
                      VerticalScrollBarVisibility="Auto"
                      Margin="0 0 0 10"/>
 
-            <TextBlock Text="Правила для Джарвіса (необов'язково)" Foreground="White" Margin="0 0 0 5"/>
+            <TextBlock Text="Правила для асистента (необов'язково)" Foreground="White" Margin="0 0 0 5"/>
             <TextBox x:Name="RulesBox"
                      Style="{StaticResource TextBoxStyle}"
                      AcceptsReturn="True"
@@ -158,9 +158,29 @@
             </StackPanel>
 
             <CheckBox x:Name="MayFocusBox"
-                      Content="Дозволити Джарвісу самому вмикати фокус-режим (закриває відволікаючі програми)"
+                      Content="Дозволити асистенту самому вмикати фокус-режим (закриває відволікаючі програми)"
                       Style="{StaticResource LeftAlignedCheckBox}"
                       Margin="0 0 0 10"/>
+
+            <CheckBox x:Name="AssistantInCloudBox"
+                      Content="Мозок у хмарі (Supabase)"
+                      Style="{StaticResource LeftAlignedCheckBox}"
+                      Margin="0 0 0 5"/>
+            <TextBlock Foreground="Gray" FontSize="12" TextWrapping="Wrap" Margin="0 0 0 10"
+                       Text="Перевірки й чат виконує функція Supabase, тож асистент спільний для всіх пристроїв і працює, навіть коли цей комп'ютер вимкнено. Потрібна синхронізація вище. Один раз: розгорніть функцію assistant (supabase/README.md), задайте ANTHROPIC_API_KEY у Supabase → Edge Functions → Secrets і натисніть «Налаштувати хмару». Ключ Anthropic API вище тоді не потрібен."/>
+
+            <StackPanel Orientation="Horizontal" Margin="0 0 0 10">
+                <Button x:Name="SetupCloudButton"
+                        Content="Налаштувати хмару"
+                        Width="200" Height="30"
+                        Click="SetupCloud_Click"
+                        Style="{StaticResource AccentButtonStyle}"/>
+            </StackPanel>
+            <TextBlock x:Name="CloudSetupStatusText"
+                       Foreground="Gray"
+                       FontSize="13"
+                       TextWrapping="Wrap"
+                       Margin="0 0 0 10"/>
 
             <StackPanel Orientation="Horizontal">
                 <Button Content="Зберегти"

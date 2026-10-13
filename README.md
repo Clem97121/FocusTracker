@@ -74,7 +74,7 @@ user.
 
 ## Jarvis
 
-A productivity assistant built on the Claude API («Налаштування» → «Джарвіс»: enable it, paste an
+A productivity assistant built on the Claude API («Налаштування» → «Коуч»: enable it, paste an
 Anthropic API key, write goals in priority order, productive hours and optional rules).
 
 - During productive hours, while the user is at this device, it checks every N minutes: the
@@ -83,12 +83,22 @@ Anthropic API key, write goals in priority order, productive hours and optional 
   a structured decision: nothing, a nudge, a question, a plan or a focus mode.
 - At the start of productive hours it proposes a plan for the day, at the end it sums the day up.
 - Messages appear in the bottom-right corner on top of other windows; «Відповісти» opens the
-  «Джарвіс» page with a chat.
+  «Коуч» page with a chat.
 - Focus mode (if allowed) closes the listed distracting programs until it ends, through the same
-  warn-then-close mechanism as restrictions. It can be stopped on the «Джарвіс» page.
+  warn-then-close mechanism as restrictions. It can be stopped on the «Коуч» page.
 
 The key is stored in `settings.json` encrypted with DPAPI. Requests to Opus and Sonnet models use
 server-side refusal fallbacks (`fallbacks: "default"`).
+
+The assistant's display name lives in one place, `FocusTracker.Domain/AssistantInfo.cs`.
+
+### Cloud brain
+
+With «Мозок у хмарі (Supabase)» on (and cloud sync configured) the checks and the chat run in the
+Supabase Edge Function `supabase/functions/assistant`, woken by `pg_cron` every 5 minutes and by a
+trigger on new chat messages. The assistant is then shared by all devices and keeps working while
+any particular PC is off; the app uploads presence and recent window titles (kept 3 hours), shows
+the function's messages, and applies the shared focus mode. One-time setup: `supabase/README.md`.
 
 ## Data
 

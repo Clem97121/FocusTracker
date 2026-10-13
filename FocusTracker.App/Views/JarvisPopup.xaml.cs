@@ -1,9 +1,10 @@
 using FocusTracker.App.Jarvis;
+using FocusTracker.Domain;
 using System.Windows;
 
 namespace FocusTracker.App.Views
 {
-    // Повідомлення Джарвіса в правому нижньому куті, поверх усіх вікон.
+    // Повідомлення асистента в правому нижньому куті, поверх усіх вікон.
     // Не забирає фокус, але й не зникає саме — щоб його не можна було просто не помітити.
     public partial class JarvisPopup : Window
     {
@@ -12,7 +13,8 @@ namespace FocusTracker.App.Views
         private JarvisPopup(JarvisNote note)
         {
             InitializeComponent();
-            HeaderText.Text = note.Kind == "focus" ? $"Джарвіс · {note.At:HH:mm} · фокус-режим" : $"Джарвіс · {note.At:HH:mm}";
+            Title = AssistantInfo.Name;
+            HeaderText.Text = note.Kind == "focus" ? $"{AssistantInfo.Name} · {note.At:HH:mm} · фокус-режим" : $"{AssistantInfo.Name} · {note.At:HH:mm}";
             MessageText.Text = note.Text;
             Loaded += (_, _) =>
             {

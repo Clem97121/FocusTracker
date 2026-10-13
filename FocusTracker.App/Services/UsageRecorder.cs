@@ -109,7 +109,7 @@ namespace FocusTracker.App.Services
 
             var violated = evaluator.TryGetViolatedRestrictions(appName, total, out var notes);
 
-            // Фокус-режим Джарвіса діє як тимчасове обмеження
+            // Фокус-режим асистента діє як тимчасове обмеження
             var focus = _services.GetRequiredService<FocusMode>();
             if (focus.Blocks(appName))
             {
