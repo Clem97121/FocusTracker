@@ -3,6 +3,7 @@
 	<application android:allowBackup="false" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true" android:label="FocusTracker"></application>
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.INTERNET" />
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 	<!-- Час по програмах: користувач вмикає вручну в «Доступ до історії використання» -->
 	<uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
 	<!-- Назви інших програм для статистики (застосунок не з Google Play, лише для себе) -->

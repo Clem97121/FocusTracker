@@ -83,6 +83,16 @@ public class PhoneSync
 
             await UploadIconsAsync(api, token, snapshot, context);
 
+            // Нові втручання Коуча — сповіщеннями (поки без push, разом із синхронізацією)
+            try
+            {
+                await CoachNotifications.CheckAsync(context, device);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Coach notifications: {ex}");
+            }
+
             LastSyncAt = now;
             LastError = null;
             return snapshot.Hours.Count;

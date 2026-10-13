@@ -26,6 +26,9 @@ public class MainPage : ContentPage
         _sync.Clicked += async (_, _) => await SyncAndLoadAsync();
         _refresh.Command = new Command(async () => await SyncAndLoadAsync());
 
+        ToolbarItems.Add(new ToolbarItem("Коуч", null, async () => await Navigation.PushAsync(new ChatPage())));
+        MainActivity.OpenChat += () => MainThread.BeginInvokeOnMainThread(OpenChatIfRequested);
+
         ToolbarItems.Add(new ToolbarItem("Вийти", null, () =>
         {
             _account.SignOut();
@@ -54,7 +57,18 @@ public class MainPage : ContentPage
     {
         base.OnAppearing();
         SyncWorker.Schedule(Platform.AppContext);
+        CoachNotifications.RequestPermission(Platform.CurrentActivity!);
+        OpenChatIfRequested();
         await SyncAndLoadAsync();
+    }
+
+    // Відкрили зі сповіщення Коуча — одразу в чат
+    private async void OpenChatIfRequested()
+    {
+        if (!MainActivity.OpenChatRequested) return;
+        MainActivity.OpenChatRequested = false;
+        if (Navigation.NavigationStack.LastOrDefault() is not ChatPage)
+            await Navigation.PushAsync(new ChatPage());
     }
 
     private async Task SyncAndLoadAsync()

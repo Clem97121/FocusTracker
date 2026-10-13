@@ -79,6 +79,16 @@ public class SupabaseApi
         await EnsureSuccessAsync(response);
     }
 
+    // Вставка з поверненням вказаних стовпців нового рядка
+    public async Task<JsonDocument> InsertReturningAsync(string table, object row, string accessToken, string select)
+    {
+        using var request = Request(HttpMethod.Post, $"{table}?select={select}", accessToken);
+        request.Content = JsonContent.Create(row, options: Json);
+        request.Headers.Add("Prefer", "return=representation");
+        using var response = await Http.SendAsync(request);
+        return await ReadAsync(response);
+    }
+
     // query — частина адреси PostgREST після «?», напр. "select=a,b&date=eq.2026-10-13"
     public async Task<JsonDocument> SelectAsync(string table, string query, string accessToken)
     {
