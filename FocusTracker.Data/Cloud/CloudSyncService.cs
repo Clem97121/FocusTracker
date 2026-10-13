@@ -312,13 +312,14 @@ namespace FocusTracker.Data.Cloud
             await db.SaveChangesAsync(token);
         }
 
-        private async Task<string?> GetStateAsync(string key)
+        // Ключ-значення синхронізації (мітки часу, останні бачені id тощо); скидається разом із ResetAsync
+        public async Task<string?> GetStateAsync(string key)
         {
             await using var db = await _dbFactory.CreateDbContextAsync();
             return (await db.SyncStates.AsNoTracking().FirstOrDefaultAsync(s => s.Key == key))?.Value;
         }
 
-        private async Task SetStateAsync(string key, string value)
+        public async Task SetStateAsync(string key, string value)
         {
             await using var db = await _dbFactory.CreateDbContextAsync();
             var state = await db.SyncStates.FirstOrDefaultAsync(s => s.Key == key);

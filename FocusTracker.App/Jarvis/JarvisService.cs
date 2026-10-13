@@ -25,8 +25,8 @@ namespace FocusTracker.App.Jarvis
     // а також відповідає в чаті
     public class JarvisService
     {
-        private const string SystemPrompt = """
-            Ти — Джарвіс, особистий асистент продуктивності користувача в застосунку FocusTracker.
+        private static readonly string SystemPrompt = $"""
+            Ти — {AssistantInfo.Name}, особистий асистент продуктивності користувача в застосунку FocusTracker.
             Ти бачиш, які програми й вікна він використовує на своїх пристроях, його цілі з пріоритетами,
             задачі та розклад. Твоє завдання — допомагати йому робити те, що наближає до цілей,
             і помічати прокрастинацію, зокрема «продуктивну»: корисну на вигляд роботу, яка зараз
@@ -53,6 +53,7 @@ namespace FocusTracker.App.Jarvis
         private readonly JarvisContext _context;
         private readonly SettingsStore _settings;
         private readonly FocusMode _focus;
+        private readonly CloudAssistant _cloud;
         private readonly object _lock = new();
         private readonly List<JarvisNote> _notes = new();
         private readonly SemaphoreSlim _gate = new(1, 1);
@@ -60,14 +61,15 @@ namespace FocusTracker.App.Jarvis
         private DateTime _morningDoneFor = DateTime.MinValue;
         private DateTime _eveningDoneFor = DateTime.MinValue;
 
-        public JarvisService(JarvisContext context, SettingsStore settings, FocusMode focus)
+        public JarvisService(JarvisContext context, SettingsStore settings, FocusMode focus, CloudAssistant cloud)
         {
             _context = context;
             _settings = settings;
             _focus = focus;
+            _cloud = cloud;
         }
 
-        // Нове повідомлення Джарвіса (втручання або відповідь у чаті). Викликається не з UI-потоку.
+        // Нове повідомлення асистента (втручання або відповідь у чаті). Викликається не з UI-потоку.
         public event Action<JarvisNote>? NoteAdded;
 
         public string? LastError { get; private set; }
@@ -97,7 +99,7 @@ namespace FocusTracker.App.Jarvis
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
                         {
-                            AppLog.Error("Помилка Джарвіса", ex);
+                            AppLog.Error("Помилка асистента", ex);
                         }
                     }
                 }
@@ -109,7 +111,8 @@ namespace FocusTracker.App.Jarvis
 
         private async Task TickAsync(bool present, CancellationToken token)
         {
-            if (!IsConfigured || !present) return;
+            // У хмарному режимі перевіряє функція Supabase, а не цей пристрій
+            if (!IsConfigured || !present || _cloud.IsActive) return;
 
             var s = _settings.Current;
             var now = DateTime.Now;
@@ -163,7 +166,7 @@ namespace FocusTracker.App.Jarvis
                 LastCheckAt = DateTime.Now;
                 if (decision == null) return null;
 
-                AppLog.Info($"Джарвіс ({kind}): {decision.Action} {decision.Message}");
+                AppLog.Info($"{AssistantInfo.Name} ({kind}): {decision.Action} {decision.Message}");
                 Apply(decision);
                 return decision;
             }
@@ -176,7 +179,7 @@ namespace FocusTracker.App.Jarvis
         // Відповідь у чаті; history — попередні репліки (user/assistant) по черзі
         public async Task<string?> ChatAsync(IReadOnlyList<(bool FromUser, string Text)> history, CancellationToken token = default)
         {
-            // Кілька реплік підряд від одного боку (напр. нагадування Джарвіса) зливаємо в одну
+            // Кілька реплік підряд від одного боку (напр. нагадування асистента) зливаємо в одну
             var merged = new List<(bool FromUser, string Text)>();
             foreach (var item in history.TakeLast(30))
             {

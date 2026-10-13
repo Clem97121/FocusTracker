@@ -1,7 +1,9 @@
 using FocusTracker.App.Helpers;
 using FocusTracker.App.Services;
 using FocusTracker.Data;
+using FocusTracker.App.Jarvis;
 using FocusTracker.Data.Cloud;
+using FocusTracker.Domain;
 using FocusTracker.Domain.Models;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -215,7 +217,9 @@ namespace FocusTracker.App.Views
         private void LoadJarvisSettings()
         {
             var s = _settings.Current;
+            AssistantHeader.Text = AssistantInfo.Name;
             JarvisEnabledBox.IsChecked = s.JarvisEnabled;
+            AssistantInCloudBox.IsChecked = s.AssistantInCloud;
             AnthropicKeyHint.Text = CloudCredentials.Unprotect(s.AnthropicKeyProtected) != null
                 ? "Ключ збережено. Залиште поле порожнім, щоб не змінювати його."
                 : "Ключ ще не задано.";
@@ -229,7 +233,7 @@ namespace FocusTracker.App.Views
             MayFocusBox.IsChecked = s.JarvisMayStartFocus;
         }
 
-        private void SaveJarvis_Click(object sender, RoutedEventArgs e)
+        private async void SaveJarvis_Click(object sender, RoutedEventArgs e)
         {
             if (!int.TryParse(FromHourBox.Text, out var from) || !int.TryParse(ToHourBox.Text, out var to) || from >= to
                 || !int.TryParse(CheckMinutesBox.Text, out var minutes))
@@ -238,12 +242,14 @@ namespace FocusTracker.App.Views
                 return;
             }
 
+            var wasInCloud = _settings.Current.AssistantInCloud;
             try
             {
                 var key = AnthropicKeyBox.Password.Trim();
                 _settings.Update(s =>
                 {
                     s.JarvisEnabled = JarvisEnabledBox.IsChecked == true;
+                    s.AssistantInCloud = AssistantInCloudBox.IsChecked == true;
                     if (key.Length > 0)
                         s.AnthropicKeyProtected = CloudCredentials.Protect(key);
                     s.JarvisModel = JarvisModelBox.SelectedValue as string ?? AppSettings.DefaultJarvisModel;
@@ -260,9 +266,60 @@ namespace FocusTracker.App.Views
             }
             catch (Exception ex)
             {
-                AppLog.Error("Не вдалося зберегти налаштування Джарвіса", ex);
+                AppLog.Error("Не вдалося зберегти налаштування асистента", ex);
                 JarvisStatusText.Text = "Не вдалося зберегти";
+                return;
             }
+
+            // Хмарна функція читає налаштування з бази; вимкнення хмарного режиму теж треба туди донести
+            if (!_sync.IsConfigured || !(wasInCloud || _settings.Current.AssistantInCloud)) return;
+            try
+            {
+                JarvisStatusText.Text = "Відправляю в хмару…";
+                await App.Services.GetRequiredService<CloudAssistant>().UploadSettingsAsync();
+                JarvisStatusText.Text = "Збережено";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Не вдалося відправити налаштування асистента в хмару", ex);
+                JarvisStatusText.Text = $"Збережено, але не відправлено в хмару: {ex.Message}";
+            }
+        }
+
+        // Розклад pg_cron і тригер чату в базі Supabase, що будять функцію асистента
+        private async void SetupCloud_Click(object sender, RoutedEventArgs e)
+        {
+            var connection = CloudCredentials.Unprotect(_settings.Current.CloudConnectionProtected);
+            if (connection == null)
+            {
+                CloudSetupStatusText.Text = "Спершу налаштуйте синхронізацію з Supabase вище.";
+                return;
+            }
+
+            var functionUrl = SupabaseProject.GetFunctionUrl(connection);
+            if (functionUrl == null)
+            {
+                CloudSetupStatusText.Text = "Не вдалося визначити проєкт Supabase з рядка підключення. Потрібен Session pooler (користувач postgres.<ref>) або пряме підключення до db.<ref>.supabase.co.";
+                return;
+            }
+
+            SetupCloudButton.IsEnabled = false;
+            CloudSetupStatusText.Text = "Налаштовую…";
+            try
+            {
+                var store = new CloudStore(connection);
+                await store.SetupAssistantAsync(functionUrl);
+                await store.UploadAssistantSettingsAsync(AssistantCloudSettings.ToJson(_settings.Current, TimeZoneInfo.Local));
+                CloudSetupStatusText.Text = _settings.Current.AssistantInCloud
+                    ? $"Готово: база кличе {functionUrl} раз на 5 хвилин і на кожне повідомлення в чаті."
+                    : $"Готово: база кличе {functionUrl}. Увімкніть «Мозок у хмарі» і збережіть.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Не вдалося налаштувати асистента в хмарі", ex);
+                CloudSetupStatusText.Text = $"Не вдалося налаштувати: {ex.Message}";
+            }
+            SetupCloudButton.IsEnabled = true;
         }
     }
 }

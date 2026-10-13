@@ -1,0 +1,7 @@
+# Конфігурація Supabase CLI для FocusTracker. Тут лише Edge Function асистента;
+# таблиці створює сам застосунок (FocusTracker.Data/Cloud/CloudStore.cs).
+
+[functions.assistant]
+# Функцію будять pg_cron і тригер бази, а не користувачі з JWT:
+# вона сама перевіряє заголовок x-ft-secret
+verify_jwt = false

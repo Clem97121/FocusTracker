@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using FocusTracker.App.Views;
+using FocusTracker.Domain;
 using System;
 using System.Runtime.InteropServices;
 using System.Windows.Interop;
@@ -16,6 +17,7 @@ namespace FocusTracker.App
        public MainWindow()
         {
             InitializeComponent();
+            JarvisButton.ToolTip = AssistantInfo.Name;
 
             SourceInitialized += (s, e) =>
             {
@@ -156,11 +158,11 @@ namespace FocusTracker.App
         private void ShowJarvisPage(object sender, RoutedEventArgs e)
         {
             MainContent.Content = new JarvisPage();
-            SetPageTitle("Джарвіс");
+            SetPageTitle(AssistantInfo.Name);
             HighlightNavButton((Button)sender);
         }
 
-        // Відкрити вікно на сторінці Джарвіса (з повідомлення в кутку)
+        // Відкрити вікно на сторінці асистента (з повідомлення в кутку)
         public void ShowJarvis()
         {
             Show();

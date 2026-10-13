@@ -6,7 +6,8 @@ using System.Text;
 namespace FocusTracker.Domain
 {
     // Що було у фокусі останні години: програма й заголовок вікна по секундах.
-    // Лише в пам'яті — заголовки не пишуться ні в базу, ні в хмару.
+    // Лише в пам'яті — заголовки не пишуться в базу. У хмару вони йдуть, лише коли
+    // увімкнено «мозок асистента у хмарі»; там зберігаються 3 години.
     public class RecentActivityLog
     {
         public static readonly TimeSpan Keep = TimeSpan.FromHours(2);
@@ -37,6 +38,13 @@ namespace FocusTracker.Domain
                 while (_items.First is { } first && now - first.Value.At > Keep)
                     _items.RemoveFirst();
             }
+        }
+
+        // Записи, які тривали після since: нові або подовжені — для відправки в хмару
+        public List<(DateTime At, string App, string Title, TimeSpan Duration)> ChangedSince(DateTime since)
+        {
+            lock (_lock)
+                return _items.Where(i => i.At + i.Duration > since).ToList();
         }
 
         // Хронологія за останні minutes хвилин: «14:05–14:32 (27 хв) chrome — Djinni — вакансії DevOps»
