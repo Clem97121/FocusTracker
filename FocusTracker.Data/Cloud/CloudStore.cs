@@ -141,6 +141,14 @@ namespace FocusTracker.Data.Cloud
             insert into public.ft_assistant_state (id) values (1) on conflict (id) do nothing;
             alter table public.ft_assistant_state enable row level security;
 
+            -- Токени Firebase телефонів: хмарна функція надсилає на них push із повідомленнями Коуча
+            create table if not exists public.ft_push_tokens (
+                device_id uuid primary key references public.ft_devices(device_id) on delete cascade,
+                token text not null,
+                updated_at timestamptz not null default now()
+            );
+            alter table public.ft_push_tokens enable row level security;
+
             -- Доступ для телефону: він ходить через Supabase API під обліковим записом власника,
             -- а не паролем бази. Кожна таблиця відкрита лише власнику (ft_owner), секрет cron — нікому.
             create table if not exists public.ft_owner (
@@ -162,7 +170,7 @@ namespace FocusTracker.Data.Cloud
             declare t text;
             begin
                 foreach t in array array['ft_devices', 'ft_hourly_usage', 'ft_programs', 'ft_program_icons', 'ft_entities',
-                    'ft_activity', 'ft_assistant_settings', 'ft_presence', 'ft_recent_activity', 'ft_assistant_messages', 'ft_focus']
+                    'ft_activity', 'ft_assistant_settings', 'ft_presence', 'ft_recent_activity', 'ft_assistant_messages', 'ft_focus', 'ft_push_tokens']
                 loop
                     execute format('revoke all on public.%I from anon', t);
                     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
@@ -186,7 +194,7 @@ namespace FocusTracker.Data.Cloud
             """;
 
         // Змінюється, коли SchemaSql отримує нові таблиці: пристрої перевіряють схему заново
-        public const int SchemaVersion = 6;
+        public const int SchemaVersion = 7;
 
         private readonly string _connectionString;
 

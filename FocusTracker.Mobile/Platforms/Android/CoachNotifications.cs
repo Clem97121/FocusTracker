@@ -35,8 +35,20 @@ public static class CoachNotifications
                      && (m.TargetDeviceId == null || m.TargetDeviceId == deviceId)
                      && DateTime.UtcNow - m.CreatedAtUtc < MaxAge))
         {
-            Show(context, message);
+            ShowOnce(context, message);
         }
+    }
+
+    // Те саме повідомлення може прийти і push, і під час синхронізації — показуємо один раз
+    public static void ShowOnce(Context context, CoachMessage message)
+    {
+        const string shownKey = "coach.shown_ids";
+        var shown = Preferences.Get(shownKey, "").Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (shown.Contains(message.Id.ToString())) return;
+
+        shown.Add(message.Id.ToString());
+        Preferences.Set(shownKey, string.Join(",", shown.TakeLast(50)));
+        Show(context, message);
     }
 
     public static void Show(Context context, CoachMessage message)

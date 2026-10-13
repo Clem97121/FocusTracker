@@ -70,6 +70,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
     steps:
       - uses: actions/checkout@v4
 
@@ -92,6 +93,8 @@ jobs:
       - name: Publish APK
         shell: pwsh
         run: |
+          # Конфігурація Firebase для push: csproj шукає її поруч із клоном
+          if ($env:GOOGLE_SERVICES_JSON) { Set-Content -Path (Join-Path $env:GITHUB_WORKSPACE '..\google-services.json') -Value $env:GOOGLE_SERVICES_JSON -NoNewline }
           $version = $env:TAG.TrimStart('v')
           $parts = $version.Split('.') | ForEach-Object { [int]$_ }
           # versionCode Android має зростати з кожною версією: 1.0.12 → 10012

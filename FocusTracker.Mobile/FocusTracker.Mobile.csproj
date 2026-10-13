@@ -48,7 +48,16 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+		<PackageReference Include="Xamarin.AndroidX.Fragment.Ktx" Version="1.9.0" />
+		<PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core" Version="2.11.0.1" />
 		<PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.11.2" />
+		<PackageReference Include="Xamarin.Firebase.Messaging" Version="125.1.2" />
+	</ItemGroup>
+
+	<!-- Конфігурація Firebase для push. Файл не в репозиторії: локально лежить поруч із клоном,
+	     у релізній збірці його записує workflow із секрету GOOGLE_SERVICES_JSON -->
+	<ItemGroup Condition="Exists('..\..\google-services.json')">
+		<GoogleServicesJson Include="..\..\google-services.json" />
 	</ItemGroup>
 
 </Project>
