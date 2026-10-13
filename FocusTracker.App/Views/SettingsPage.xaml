@@ -90,6 +90,31 @@
                        TextWrapping="Wrap"
                        Margin="0 10 0 0"/>
 
+            <TextBlock Text="Телефон"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       Margin="0 40 0 10"/>
+
+            <TextBlock Foreground="Gray" FontSize="13" TextWrapping="Wrap" Margin="0 0 0 15"
+                       Text="Телефон ходить у базу не паролем бази, а під обліковим записом Supabase, і бачить лише ваші дані. Один раз: Supabase → Authentication → Users → Add user (email і пароль, позначте Auto Confirm User), потім введіть цей email тут і натисніть «Прив'язати». Радимо також вимкнути реєстрацію нових користувачів: Authentication → Sign In / Providers → Allow new users to sign up."/>
+
+            <TextBlock Text="Email облікового запису Supabase" Foreground="White" Margin="0 0 0 5"/>
+            <TextBox x:Name="OwnerEmailBox" Style="{StaticResource TextBoxStyle}" Margin="0 0 0 10"/>
+
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="BindOwnerButton"
+                        Content="Прив'язати"
+                        Width="150" Height="30"
+                        Click="BindOwner_Click"
+                        Style="{StaticResource AccentButtonStyle}"/>
+                <TextBlock x:Name="OwnerStatusText"
+                           Foreground="Gray"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="15 0 0 0"/>
+            </StackPanel>
+
             <TextBlock x:Name="AssistantHeader"
                        FontSize="18"
                        FontWeight="Bold"

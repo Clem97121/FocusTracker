@@ -39,6 +39,7 @@ namespace FocusTracker.App.Views
             }
 
             LoadJarvisSettings();
+            LoadOwner();
 
             _sync = App.Services.GetRequiredService<CloudSyncRunner>();
             LoadSyncSettings();
@@ -213,6 +214,54 @@ namespace FocusTracker.App.Views
         }
 
         private void OnSyncStatusChanged() => Dispatcher.Invoke(ShowSyncStatus);
+
+        private async void LoadOwner()
+        {
+            var connection = CloudCredentials.Unprotect(_settings.Current.CloudConnectionProtected);
+            if (connection == null)
+            {
+                OwnerStatusText.Text = "Спершу налаштуйте синхронізацію вище.";
+                BindOwnerButton.IsEnabled = false;
+                return;
+            }
+
+            try
+            {
+                var email = await new CloudStore(connection).GetOwnerEmailAsync();
+                OwnerStatusText.Text = email == null ? "Телефон ще не прив'язано." : $"Власник: {email}";
+                if (email != null) OwnerEmailBox.Text = email;
+            }
+            catch (Exception ex)
+            {
+                OwnerStatusText.Text = $"Не вдалося перевірити: {ex.Message}";
+            }
+        }
+
+        private async void BindOwner_Click(object sender, RoutedEventArgs e)
+        {
+            var connection = CloudCredentials.Unprotect(_settings.Current.CloudConnectionProtected);
+            var email = OwnerEmailBox.Text.Trim();
+            if (connection == null || email.Length == 0)
+            {
+                OwnerStatusText.Text = "Введіть email облікового запису Supabase.";
+                return;
+            }
+
+            BindOwnerButton.IsEnabled = false;
+            OwnerStatusText.Text = "Прив'язую…";
+            try
+            {
+                OwnerStatusText.Text = await new CloudStore(connection).BindOwnerAsync(email)
+                    ? $"Власник: {email}. Цим email і паролем входьте в застосунку на телефоні."
+                    : "Користувача з таким email у Supabase немає. Створіть його: Authentication → Users → Add user.";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Не вдалося прив'язати власника для телефону", ex);
+                OwnerStatusText.Text = $"Не вдалося прив'язати: {ex.Message}";
+            }
+            BindOwnerButton.IsEnabled = true;
+        }
 
         private void LoadJarvisSettings()
         {
