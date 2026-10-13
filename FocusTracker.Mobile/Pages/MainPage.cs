@@ -15,6 +15,8 @@ public class MainPage : ContentPage
     private readonly Label _total = new() { FontSize = 18, FontAttributes = FontAttributes.Bold };
     private readonly VerticalStackLayout _apps = new() { Spacing = 6 };
     private readonly RefreshView _refresh = new();
+    private readonly Button _update = new() { IsVisible = false, BackgroundColor = Color.FromArgb("#3E8E5A"), TextColor = Colors.White };
+    private AppUpdate? _available;
 
     public MainPage()
     {
@@ -25,6 +27,7 @@ public class MainPage : ContentPage
         _permission.Clicked += (_, _) => UsageCollector.RequestPermission(Platform.CurrentActivity!);
         _sync.Clicked += async (_, _) => await SyncAndLoadAsync();
         _refresh.Command = new Command(async () => await SyncAndLoadAsync());
+        _update.Clicked += async (_, _) => await InstallUpdateAsync();
 
         ToolbarItems.Add(new ToolbarItem("Коуч", null, async () => await Navigation.PushAsync(new ChatPage())));
         MainActivity.OpenChat += () => MainThread.BeginInvokeOnMainThread(OpenChatIfRequested);
@@ -43,7 +46,7 @@ public class MainPage : ContentPage
                 Spacing = 12,
                 Children =
                 {
-                    _status, _permission, _sync,
+                    _update, _status, _permission, _sync,
                     new Label { Text = "Назва цього телефону", TextColor = Colors.Gray }, _deviceName,
                     new Label { Text = "Сьогодні на всіх пристроях", FontSize = 20, FontAttributes = FontAttributes.Bold, Margin = new Thickness(0, 12, 0, 0) },
                     _total, _apps,
@@ -59,7 +62,53 @@ public class MainPage : ContentPage
         SyncWorker.Schedule(Platform.AppContext);
         CoachNotifications.RequestPermission(Platform.CurrentActivity!);
         OpenChatIfRequested();
+        _ = CheckUpdateAsync();
         await SyncAndLoadAsync();
+    }
+
+    private async Task CheckUpdateAsync()
+    {
+        try
+        {
+            _available = await AppUpdater.CheckAsync();
+            if (_available == null) return;
+            _update.Text = $"Доступна версія {_available.Version} — оновити";
+            _update.IsVisible = true;
+        }
+        catch
+        {
+            // Без мережі перевіримо наступного разу
+        }
+    }
+
+    // Завантажити APK з GitHub і відкрити системне встановлення поверх поточної версії
+    private async Task InstallUpdateAsync()
+    {
+        if (_available == null) return;
+        var context = Platform.AppContext;
+        if (!ApkInstaller.CanInstall(context))
+        {
+            await DisplayAlertAsync("Оновлення", "Дозвольте FocusTracker встановлювати програми й натисніть «Оновити» ще раз.", "Добре");
+            ApkInstaller.RequestInstallPermission(context);
+            return;
+        }
+
+        _update.IsEnabled = false;
+        try
+        {
+            var path = await AppUpdater.DownloadAsync(_available,
+                new Progress<double>(p => _update.Text = $"Завантаження… {p:P0}"));
+            await ApkInstaller.InstallAsync(path);
+            _update.Text = $"Встановіть версію {_available.Version}";
+        }
+        catch (Exception ex)
+        {
+            _update.Text = $"Не вдалося завантажити: {ex.Message}";
+        }
+        finally
+        {
+            _update.IsEnabled = true;
+        }
     }
 
     // Відкрили зі сповіщення Коуча — одразу в чат

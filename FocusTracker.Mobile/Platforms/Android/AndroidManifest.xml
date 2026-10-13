@@ -8,4 +8,6 @@
 	<uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
 	<!-- Назви інших програм для статистики (застосунок не з Google Play, лише для себе) -->
 	<uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+	<!-- Встановлення оновлень із GitHub Releases -->
+	<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 </manifest>

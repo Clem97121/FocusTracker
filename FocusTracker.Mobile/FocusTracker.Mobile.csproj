@@ -23,6 +23,9 @@
 		<ApplicationVersion>1</ApplicationVersion>
 
 		<SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
+
+		<!-- Запити до Supabase серіалізують анонімні типи через рефлексію; в обрізаній Release-збірці її треба лишити -->
+		<JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
 	</PropertyGroup>
 
 	<ItemGroup>
