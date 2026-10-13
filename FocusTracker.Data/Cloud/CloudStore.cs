@@ -140,10 +140,53 @@ namespace FocusTracker.Data.Cloud
             );
             insert into public.ft_assistant_state (id) values (1) on conflict (id) do nothing;
             alter table public.ft_assistant_state enable row level security;
+
+            -- Доступ для телефону: він ходить через Supabase API під обліковим записом власника,
+            -- а не паролем бази. Кожна таблиця відкрита лише власнику (ft_owner), секрет cron — нікому.
+            create table if not exists public.ft_owner (
+                id integer primary key check (id = 1),
+                user_id uuid not null,
+                email text not null,
+                updated_at timestamptz not null default now()
+            );
+            alter table public.ft_owner enable row level security;
+
+            create or replace function public.ft_is_owner() returns boolean
+            language sql stable security definer set search_path = public as $fn$
+                select exists (select 1 from public.ft_owner where user_id = auth.uid());
+            $fn$;
+            revoke all on function public.ft_is_owner() from public, anon;
+            grant execute on function public.ft_is_owner() to authenticated;
+
+            do $do$
+            declare t text;
+            begin
+                foreach t in array array['ft_devices', 'ft_hourly_usage', 'ft_programs', 'ft_program_icons', 'ft_entities',
+                    'ft_activity', 'ft_assistant_settings', 'ft_presence', 'ft_recent_activity', 'ft_assistant_messages', 'ft_focus']
+                loop
+                    execute format('revoke all on public.%I from anon', t);
+                    execute format('grant select, insert, update, delete on public.%I to authenticated', t);
+                    execute format('drop policy if exists ft_owner_all on public.%I', t);
+                    execute format('create policy ft_owner_all on public.%I for all to authenticated using (public.ft_is_owner()) with check (public.ft_is_owner())', t);
+                end loop;
+            end
+            $do$;
+            grant usage, select on sequence public.ft_recent_activity_id_seq, public.ft_assistant_messages_id_seq to authenticated;
+
+            revoke all on public.ft_owner from anon, authenticated;
+            grant select on public.ft_owner to authenticated;
+            drop policy if exists ft_owner_self on public.ft_owner;
+            create policy ft_owner_self on public.ft_owner for select to authenticated using (user_id = auth.uid());
+
+            -- Стан функції без cron_secret: ним функцію будить лише сама база
+            revoke all on public.ft_assistant_state from anon, authenticated;
+            grant select (id, last_check_at, last_run_at, last_error, plan_date, review_date, memory) on public.ft_assistant_state to authenticated;
+            drop policy if exists ft_owner_read on public.ft_assistant_state;
+            create policy ft_owner_read on public.ft_assistant_state for select to authenticated using (public.ft_is_owner());
             """;
 
         // Змінюється, коли SchemaSql отримує нові таблиці: пристрої перевіряють схему заново
-        public const int SchemaVersion = 5;
+        public const int SchemaVersion = 6;
 
         private readonly string _connectionString;
 
@@ -155,6 +198,37 @@ namespace FocusTracker.Data.Cloud
                 builder.SslMode = SslMode.Require;
             builder.Timeout = Math.Max(builder.Timeout, 15);
             _connectionString = builder.ConnectionString;
+        }
+
+        // Власник даних для телефону: обліковий запис Supabase Auth з цим email отримує доступ до таблиць.
+        // Повертає false, якщо такого користувача в Supabase ще немає.
+        public async Task<bool> BindOwnerAsync(string email, CancellationToken token = default)
+        {
+            await EnsureSchemaAsync(token);
+            await using var connection = await OpenAsync(token);
+            await using var command = new NpgsqlCommand("""
+                insert into public.ft_owner (id, user_id, email)
+                select 1, u.id, u.email from auth.users u where lower(u.email) = lower(@email)
+                on conflict (id) do update set user_id = excluded.user_id, email = excluded.email, updated_at = now();
+                """, connection);
+            command.Parameters.AddWithValue("email", email.Trim());
+            return await command.ExecuteNonQueryAsync(token) > 0;
+        }
+
+        // Email власника або null, якщо телефон ще не прив'язано
+        public async Task<string?> GetOwnerEmailAsync(CancellationToken token = default)
+        {
+            await using var connection = await OpenAsync(token);
+            await using var command = new NpgsqlCommand(
+                "select email from public.ft_owner where id = 1;", connection);
+            try
+            {
+                return await command.ExecuteScalarAsync(token) as string;
+            }
+            catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UndefinedTable)
+            {
+                return null;
+            }
         }
 
         public async Task EnsureSchemaAsync(CancellationToken token = default)
