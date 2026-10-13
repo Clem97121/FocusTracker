@@ -12,9 +12,12 @@ using System.Threading.Tasks;
 
 namespace FocusTracker.App.Jarvis
 {
-    // Режим «мозок у хмарі»: перевірки й чат виконує функція Supabase (supabase/functions/assistant).
-    // Застосунок відправляє їй присутність і недавню активність, показує її повідомлення
-    // й застосовує спільний для всіх пристроїв фокус-режим.
+    // Повідомлення Коуча для віконця в кутку
+    public record JarvisNote(DateTime At, string Kind, string Text);
+
+    // Коуч живе в хмарі: перевірки й чат виконує функція Supabase (supabase/functions/assistant).
+    // Застосунок сам налаштовує базу, щоб вона будила функцію, відправляє їй присутність
+    // і недавню активність, показує її повідомлення й застосовує спільний для всіх пристроїв фокус-режим.
     public class CloudAssistant
     {
         public static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(30);
@@ -23,6 +26,8 @@ namespace FocusTracker.App.Jarvis
         private static readonly TimeSpan ReplyTimeout = TimeSpan.FromSeconds(90);
         // Втручання, які прийшли, поки застосунок був вимкнений, у кутку вже не показуємо
         private static readonly TimeSpan PopupMaxAge = TimeSpan.FromMinutes(15);
+        // Після невдалого налаштування бази пробуємо знову не одразу, а через деякий час
+        private static readonly TimeSpan SetupRetryInterval = TimeSpan.FromMinutes(5);
 
         private const string LastSeenKey = "assistant.last_seen_message_id";
 
@@ -36,6 +41,7 @@ namespace FocusTracker.App.Jarvis
         private DateTime? _appliedFocusUpdatedAt;
         private bool _focusFromCloud;
         private string? _lastLoggedError;
+        private DateTime _setupRetryAt = DateTime.MinValue;
 
         public CloudAssistant(SettingsStore settings, CloudSyncService sync, RecentActivityLog recent, FocusMode focus)
         {
@@ -54,12 +60,18 @@ namespace FocusTracker.App.Jarvis
         // Помилка зв'язку з хмарою (не самої функції)
         public string? LastError { get; private set; }
 
+        // Не вдалося налаштувати розклад і тригер у базі; повторимо пізніше
+        public string? SetupError { get; private set; }
+
         // Стан функції в хмарі: коли запускалась і чи була помилка
         public CloudAssistantState? State { get; private set; }
 
-        // Хмарний режим діє, лише коли асистента увімкнено й налаштовано синхронізацію
-        public bool IsActive => _settings.Current is { JarvisEnabled: true, AssistantInCloud: true, CloudSyncEnabled: true } s
+        // Коуч працює лише через хмарну базу
+        public bool IsCloudConfigured => _settings.Current is { CloudSyncEnabled: true } s
             && CloudCredentials.Unprotect(s.CloudConnectionProtected) != null;
+
+        // Коуч діє, коли його увімкнено й налаштовано синхронізацію з хмарою
+        public bool IsActive => _settings.Current.JarvisEnabled && IsCloudConfigured;
 
         public void Start(Func<(DateTime LastInput, string App)> presence, CancellationToken token)
         {
@@ -87,6 +99,8 @@ namespace FocusTracker.App.Jarvis
             {
                 var store = Store();
                 if (store == null) return;
+
+                await EnsureSetupAsync(store, token);
 
                 if (DateTime.Now - _lastUploadAt >= UploadInterval - TimeSpan.FromSeconds(5))
                 {
@@ -117,6 +131,36 @@ namespace FocusTracker.App.Jarvis
             finally
             {
                 _gate.Release();
+            }
+        }
+
+        // Розклад pg_cron і тригер чату, що будять функцію, ставимо самі — раз на пристрій і версію.
+        // Помилка не заважає решті: пишемо в лог і пробуємо знову пізніше.
+        private async Task EnsureSetupAsync(CloudStore store, CancellationToken token)
+        {
+            if (DateTime.Now < _setupRetryAt) return;
+            try
+            {
+                var configured = await _sync.EnsureAssistantSetupAsync(_settings.Current.DeviceId, t =>
+                {
+                    var functionUrl = SupabaseProject.GetFunctionUrl(CloudCredentials.Unprotect(_settings.Current.CloudConnectionProtected))
+                        ?? throw new InvalidOperationException("Не вдалося визначити проєкт Supabase з рядка підключення. Потрібен Session pooler (користувач postgres.<ref>) або пряме підключення до db.<ref>.supabase.co.");
+                    return store.SetupAssistantAsync(functionUrl, t);
+                }, token);
+                if (configured)
+                    AppLog.Info($"{AssistantInfo.Name}: базу налаштовано, функція викликатиметься раз на 5 хвилин і на кожне повідомлення в чаті.");
+                SetupError = null;
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _setupRetryAt = DateTime.Now + SetupRetryInterval;
+                if (SetupError != ex.Message)
+                    AppLog.Error($"Не вдалося налаштувати {AssistantInfo.Name} у хмарі", ex);
+                SetupError = ex.Message;
             }
         }
 

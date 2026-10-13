@@ -97,6 +97,33 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Equal(AppSettings.DefaultIdleThresholdMinutes, new SettingsStore(SettingsPath).Current.IdleThresholdMinutes);
     }
 
+    [Fact]
+    public void Removed_settings_in_old_file_are_ignored()
+    {
+        // Колишні поля локального режиму Коуча (ключ Anthropic і «Мозок у хмарі»)
+        Directory.CreateDirectory(_dir);
+        var deviceId = Guid.NewGuid();
+        File.WriteAllText(SettingsPath, $$"""
+            {
+              "IdleThresholdMinutes": 9,
+              "DeviceId": "{{deviceId}}",
+              "CloudSyncEnabled": true,
+              "JarvisEnabled": true,
+              "AnthropicKeyProtected": "AQAAANCMnd8BFdERjHoAwE",
+              "Goals": "1. Робота",
+              "AssistantInCloud": true
+            }
+            """);
+
+        var current = new SettingsStore(SettingsPath).Current;
+
+        Assert.Equal(9, current.IdleThresholdMinutes);
+        Assert.Equal(deviceId, current.DeviceId);
+        Assert.True(current.CloudSyncEnabled);
+        Assert.True(current.JarvisEnabled);
+        Assert.Equal("1. Робота", current.Goals);
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_dir, recursive: true); } catch { }

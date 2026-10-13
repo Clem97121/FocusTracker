@@ -19,8 +19,8 @@ namespace FocusTracker.Data.Cloud
             checkMinutes = s.JarvisCheckMinutes,
             mayStartFocus = s.JarvisMayStartFocus,
             model = s.JarvisModel,
-            // Хмара працює, лише поки на якомусь пристрої увімкнено асистента в хмарному режимі
-            enabled = s.JarvisEnabled && s.AssistantInCloud,
+            // Функція працює, лише поки Коуча увімкнено в налаштуваннях застосунку
+            enabled = s.JarvisEnabled,
             timeZone = IanaId(timeZone),
             name = AssistantInfo.Name,
         }, Json);

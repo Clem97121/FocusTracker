@@ -187,6 +187,9 @@ namespace FocusTracker.Data.Cloud
         // Розклад і тригер, що будять функцію асистента: pg_cron раз на 5 хвилин ({"reason":"tick"})
         // і тригер на нові повідомлення користувача ({"reason":"chat"}). Секрет для заголовка
         // x-ft-secret читається з ft_assistant_state під час виклику, тож у тексті завдань його немає.
+        // Застосунок запускає це сам на кожному пристрої, тож усе ідемпотентне: функцію й тригер
+        // замінюємо, завдання cron перестворюємо за назвою, а одночасні запуски з різних
+        // пристроїв ідуть один за одним завдяки блокуванню в транзакції.
         public async Task SetupAssistantAsync(string functionUrl, CancellationToken token = default)
         {
             if (!Uri.TryCreate(functionUrl, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
@@ -195,7 +198,10 @@ namespace FocusTracker.Data.Cloud
             await EnsureSchemaAsync(token);
 
             await using var connection = await OpenAsync(token);
+            await using var transaction = await connection.BeginTransactionAsync(token);
             await using var command = new NpgsqlCommand($$"""
+                select pg_advisory_xact_lock(hashtext('{{CronJobName}}'));
+
                 create extension if not exists pg_cron;
                 create extension if not exists pg_net with schema extensions;
 
@@ -214,8 +220,9 @@ namespace FocusTracker.Data.Cloud
 
                 select cron.unschedule(jobid) from cron.job where jobname = '{{CronJobName}}';
                 select cron.schedule('{{CronJobName}}', '*/5 * * * *', $cmd$ select {{HttpPostSql(uri, "tick")}}; $cmd$);
-                """, connection);
+                """, connection, transaction);
             await command.ExecuteNonQueryAsync(token);
+            await transaction.CommitAsync(token);
         }
 
         private static string HttpPostSql(Uri uri, string reason) => $$"""

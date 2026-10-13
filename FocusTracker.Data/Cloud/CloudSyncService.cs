@@ -17,6 +17,10 @@ namespace FocusTracker.Data.Cloud
         private const string SchemaReadyKey = "cloud.schema_ready_for";
         private const string ProgramsUploadWatermarkKey = "cloud.programs_upload_watermark";
         private const string ProgramsDownloadWatermarkKey = "cloud.programs_download_watermark";
+        public const string AssistantSetupKey = "assistant.setup_for";
+
+        // Збільшити, коли змінюється CloudStore.SetupAssistantAsync: кожен пристрій налаштує базу знову
+        public const int AssistantSetupVersion = 1;
 
         // Транзакція на сервері може зафіксуватись пізніше за свій updated_at,
         // тож завантажуємо з запасом; повторні рядки просто перезапишуться
@@ -89,6 +93,22 @@ namespace FocusTracker.Data.Cloud
             await cloud.EnsureSchemaAsync(token);
             await SetStateAsync(SchemaReadyKey, marker);
         }
+
+        // Розклад і тригер Коуча в базі: раз на пристрій і версію налаштування.
+        // Якщо setup падає, позначки немає — спробуємо знову наступного разу.
+        // true — налаштування виконано зараз, false — вже було зроблено раніше.
+        public async Task<bool> EnsureAssistantSetupAsync(Guid deviceId, Func<CancellationToken, Task> setup, CancellationToken token = default)
+        {
+            var marker = AssistantSetupMarker(deviceId);
+            if (await GetStateAsync(AssistantSetupKey) == marker) return false;
+
+            await setup(token);
+            await SetStateAsync(AssistantSetupKey, marker);
+            return true;
+        }
+
+        private static string AssistantSetupMarker(Guid deviceId) =>
+            $"{deviceId}:{AssistantSetupVersion.ToString(CultureInfo.InvariantCulture)}";
 
         private async Task<int> UploadAsync(CloudStore cloud, Guid deviceId, CancellationToken token)
         {

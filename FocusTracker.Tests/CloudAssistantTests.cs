@@ -52,7 +52,6 @@ public class AssistantCloudSettingsTests
             JarvisMayStartFocus = false,
             JarvisModel = "claude-sonnet-5-5",
             JarvisEnabled = true,
-            AssistantInCloud = true,
         };
 
         using var doc = JsonDocument.Parse(AssistantCloudSettings.ToJson(settings, TimeZoneInfo.Utc));
@@ -70,9 +69,9 @@ public class AssistantCloudSettingsTests
     }
 
     [Fact]
-    public void Cloud_is_disabled_without_cloud_mode()
+    public void Cloud_is_disabled_when_coach_is_off()
     {
-        var settings = new AppSettings { JarvisEnabled = true, AssistantInCloud = false };
+        var settings = new AppSettings { JarvisEnabled = false };
         using var doc = JsonDocument.Parse(AssistantCloudSettings.ToJson(settings, TimeZoneInfo.Utc));
         Assert.False(doc.RootElement.GetProperty("enabled").GetBoolean());
     }
@@ -83,6 +82,49 @@ public class AssistantCloudSettingsTests
         var kyiv = TimeZoneInfo.CreateCustomTimeZone("FLE Standard Time", TimeSpan.FromHours(2), "Kyiv", "Kyiv");
         Assert.StartsWith("Europe/", AssistantCloudSettings.IanaId(kyiv));
         Assert.Equal("UTC", AssistantCloudSettings.IanaId(TimeZoneInfo.CreateCustomTimeZone("Nowhere", TimeSpan.Zero, "x", "x")));
+    }
+}
+
+public class AssistantSetupTests
+{
+    [Fact]
+    public async Task Setup_runs_once_per_device_and_is_retried_after_failure()
+    {
+        using var db = new TestDb();
+        var sync = new CloudSyncService(db);
+        var deviceId = Guid.NewGuid();
+        var calls = 0;
+
+        // Невдале налаштування не запам'ятовується
+        await Assert.ThrowsAsync<InvalidOperationException>(() => sync.EnsureAssistantSetupAsync(deviceId, _ =>
+        {
+            calls++;
+            throw new InvalidOperationException("pg_cron недоступний");
+        }));
+        Assert.Null(await sync.GetStateAsync(CloudSyncService.AssistantSetupKey));
+
+        Func<CancellationToken, Task> setup = _ => { calls++; return Task.CompletedTask; };
+        Assert.True(await sync.EnsureAssistantSetupAsync(deviceId, setup));
+        Assert.False(await sync.EnsureAssistantSetupAsync(deviceId, setup));
+        Assert.Equal(2, calls);
+
+        // Інша база (скидання стану) — налаштовуємо знову
+        await sync.ResetAsync();
+        Assert.True(await sync.EnsureAssistantSetupAsync(deviceId, setup));
+        Assert.Equal(3, calls);
+    }
+
+    [Fact]
+    public async Task Older_setup_version_is_redone()
+    {
+        using var db = new TestDb();
+        var sync = new CloudSyncService(db);
+        var deviceId = Guid.NewGuid();
+        await sync.SetStateAsync(CloudSyncService.AssistantSetupKey, $"{deviceId}:{CloudSyncService.AssistantSetupVersion - 1}");
+
+        var calls = 0;
+        Assert.True(await sync.EnsureAssistantSetupAsync(deviceId, _ => { calls++; return Task.CompletedTask; }));
+        Assert.Equal(1, calls);
     }
 }
 
