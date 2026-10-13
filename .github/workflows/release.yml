@@ -60,3 +60,57 @@ jobs:
       - name: Upload
         shell: pwsh
         run: vpk upload github --repoUrl $env:REPO_URL --publish --releaseName "FocusTracker $env:VERSION" --tag $env:TAG --token $env:GH_TOKEN
+
+  # APK для телефону — у той самий реліз; застосунок на телефоні знаходить його й оновлюється
+  android:
+    needs: release
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: '17'
+
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android
+
+      - name: Android SDK
+        shell: pwsh
+        run: dotnet build FocusTracker.Mobile/FocusTracker.Mobile.csproj -t:InstallAndroidDependencies -f net10.0-android "-p:AndroidSdkDirectory=$env:ANDROID_HOME" -p:AcceptAndroidSDKLicenses=True
+
+      - name: Publish APK
+        shell: pwsh
+        run: |
+          $version = $env:TAG.TrimStart('v')
+          $parts = $version.Split('.') | ForEach-Object { [int]$_ }
+          # versionCode Android має зростати з кожною версією: 1.0.12 → 10012
+          $code = $parts[0] * 10000 + $parts[1] * 100 + $parts[2]
+          $keystore = Join-Path $env:RUNNER_TEMP 'focustracker.keystore'
+          [IO.File]::WriteAllBytes($keystore, [Convert]::FromBase64String($env:ANDROID_KEYSTORE_BASE64))
+          dotnet publish FocusTracker.Mobile/FocusTracker.Mobile.csproj -f net10.0-android -c Release -o out/android `
+            "-p:AndroidSdkDirectory=$env:ANDROID_HOME" `
+            -p:AndroidPackageFormats=apk `
+            -p:AndroidKeyStore=true `
+            "-p:AndroidSigningKeyStore=$keystore" `
+            -p:AndroidSigningKeyAlias=focustracker `
+            -p:AndroidSigningStorePass=env:ANDROID_KEYSTORE_PASSWORD `
+            -p:AndroidSigningKeyPass=env:ANDROID_KEYSTORE_PASSWORD `
+            "-p:ApplicationDisplayVersion=$version" `
+            "-p:ApplicationVersion=$code"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $apk = Get-ChildItem out/android -Filter '*-Signed.apk' | Select-Object -First 1
+          Copy-Item $apk.FullName out/FocusTracker-android.apk
+
+      - name: Upload APK
+        run: gh release upload ${{ github.ref_name }} out/FocusTracker-android.apk --clobber
