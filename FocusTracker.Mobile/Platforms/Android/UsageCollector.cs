@@ -86,7 +86,30 @@ public static class UsageCollector
         }
 
         var (hours, minutes) = UsageAggregator.Aggregate(intervals);
-        return new UsageSnapshot(hours, minutes, lastActivity?.ToUniversalTime(), foreground);
+        var packages = labels.GroupBy(l => l.Value).ToDictionary(g => g.Key, g => g.First().Key);
+        return new UsageSnapshot(hours, minutes, lastActivity?.ToUniversalTime(), foreground, packages);
+    }
+
+    // Іконка програми як PNG 64×64 — так само, як ПК зберігає іконки з exe
+    public static byte[]? IconPng(Context context, string package)
+    {
+        try
+        {
+            var drawable = context.PackageManager!.GetApplicationIcon(package);
+            const int size = 64;
+            using var bitmap = global::Android.Graphics.Bitmap.CreateBitmap(size, size, global::Android.Graphics.Bitmap.Config.Argb8888!)!;
+            using var canvas = new global::Android.Graphics.Canvas(bitmap);
+            drawable.SetBounds(0, 0, size, size);
+            drawable.Draw(canvas);
+
+            using var stream = new MemoryStream();
+            bitmap.Compress(global::Android.Graphics.Bitmap.CompressFormat.Png!, 100, stream);
+            return stream.ToArray();
+        }
+        catch (PackageManager.NameNotFoundException)
+        {
+            return null;
+        }
     }
 
     // Робочий стіл, системна шторка й сам FocusTracker — не «програми», їх не рахуємо

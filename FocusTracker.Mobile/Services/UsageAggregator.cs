@@ -4,11 +4,13 @@ public record UsageInterval(string App, DateTime StartLocal, DateTime EndLocal);
 
 public record HourUsage(string App, DateOnly Date, int Hour, double Seconds);
 
+// Packages — назва програми (як у статистиці) → пакет Android, з якого беремо іконку
 public record UsageSnapshot(
     List<HourUsage> Hours,
     Dictionary<DateOnly, byte[]> Minutes,
     DateTime? LastActivityUtc,
-    string? ForegroundApp);
+    string? ForegroundApp,
+    Dictionary<string, string> Packages);
 
 // Інтервали «програма була на екрані» → секунди по годинах і хвилини присутності за добу,
 // у тих самих форматах, що й у ПК (ft_hourly_usage, ft_activity)

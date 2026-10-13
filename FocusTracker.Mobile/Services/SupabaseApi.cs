@@ -60,11 +60,12 @@ public class SupabaseApi
     }
 
     // Вставка або оновлення рядків за ключем onConflict (стовпці через кому)
-    public async Task UpsertAsync(string table, string onConflict, object rows, string accessToken)
+    // ignoreDuplicates — наявні рядки не чіпати (лише додати нові)
+    public async Task UpsertAsync(string table, string onConflict, object rows, string accessToken, bool ignoreDuplicates = false)
     {
         using var request = Request(HttpMethod.Post, $"{table}?on_conflict={onConflict}", accessToken);
         request.Content = JsonContent.Create(rows, options: Json);
-        request.Headers.Add("Prefer", "resolution=merge-duplicates,return=minimal");
+        request.Headers.Add("Prefer", $"resolution={(ignoreDuplicates ? "ignore" : "merge")}-duplicates,return=minimal");
         using var response = await Http.SendAsync(request);
         await EnsureSuccessAsync(response);
     }
@@ -123,6 +124,9 @@ public class SupabaseApi
         }
         throw new SupabaseException($"{(int)response.StatusCode}: {message}");
     }
+
+    public static byte[] FromBytea(string value) =>
+        Convert.FromHexString(value.StartsWith("\\x") ? value[2..] : value);
 
     // bytea у JSON PostgREST — рядок "\x" + hex
     public static string ToBytea(byte[] bytes)

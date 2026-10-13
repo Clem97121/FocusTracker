@@ -107,20 +107,42 @@ public class MainPage : ContentPage
             .Select(g => $"{names.GetValueOrDefault(g.Key, "?")}: {Format(TimeSpan.FromSeconds(g.Sum(u => u.Seconds)))}");
         _total.Text = $"Разом {Format(total)}\n{string.Join(" · ", byDevice)}";
 
+        var top = usage.GroupBy(u => u.App).Select(g => (App: g.Key, Seconds: g.Sum(u => u.Seconds)))
+            .OrderByDescending(a => a.Seconds).Take(25).ToList();
+        var icons = await LoadIconsAsync(api, token, top.Select(a => a.App));
+
         _apps.Children.Clear();
-        foreach (var app in usage.GroupBy(u => u.App).Select(g => (App: g.Key, Seconds: g.Sum(u => u.Seconds)))
-                     .OrderByDescending(a => a.Seconds).Take(25))
+        foreach (var app in top)
         {
             _apps.Children.Add(new Grid
             {
-                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+                ColumnSpacing = 10,
+                ColumnDefinitions = { new ColumnDefinition(28), new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
                 Children =
                 {
-                    new Label { Text = app.App, LineBreakMode = LineBreakMode.TailTruncation },
-                    new Label { Text = Format(TimeSpan.FromSeconds(app.Seconds)), TextColor = Colors.Gray }.Column(1),
+                    new Image
+                    {
+                        HeightRequest = 24, WidthRequest = 24,
+                        Source = icons.TryGetValue(app.App, out var icon) ? ImageSource.FromStream(() => new MemoryStream(icon)) : null,
+                    },
+                    new Label { Text = app.App, LineBreakMode = LineBreakMode.TailTruncation, VerticalOptions = LayoutOptions.Center }.Column(1),
+                    new Label { Text = Format(TimeSpan.FromSeconds(app.Seconds)), TextColor = Colors.Gray, VerticalOptions = LayoutOptions.Center }.Column(2),
                 }
             });
         }
+    }
+
+    // Іконки зі спільної ft_program_icons: і програм телефону, і програм з ПК
+    private static async Task<Dictionary<string, byte[]>> LoadIconsAsync(SupabaseApi api, string token, IEnumerable<string> apps)
+    {
+        var names = apps.Select(a => "\"" + a.Replace("\"", "\\\"") + "\"").ToList();
+        if (names.Count == 0) return new();
+
+        var filter = Uri.EscapeDataString($"({string.Join(",", names)})");
+        using var rows = await api.SelectAsync("ft_program_icons", $"select=identifier,icon&identifier=in.{filter}", token);
+        return rows.RootElement.EnumerateArray().ToDictionary(
+            r => r.GetProperty("identifier").GetString()!,
+            r => SupabaseApi.FromBytea(r.GetProperty("icon").GetString()!));
     }
 
     private static string Format(TimeSpan t) => t.TotalHours >= 1 ? $"{(int)t.TotalHours} год {t.Minutes} хв" : $"{t.Minutes} хв";

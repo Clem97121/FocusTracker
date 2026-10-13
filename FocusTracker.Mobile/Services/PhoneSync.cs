@@ -81,6 +81,8 @@ public class PhoneSync
                 }
             }, token);
 
+            await UploadIconsAsync(api, token, snapshot, context);
+
             LastSyncAt = now;
             LastError = null;
             return snapshot.Hours.Count;
@@ -94,5 +96,26 @@ public class PhoneSync
         {
             Gate.Release();
         }
+    }
+
+    // Іконки програм телефону — у спільну ft_program_icons, лише ті, яких там ще немає.
+    // ПК забирає звідти іконки програм, яких у нього немає.
+    private static async Task UploadIconsAsync(SupabaseApi api, string token, UsageSnapshot snapshot, global::Android.Content.Context context)
+    {
+        if (snapshot.Packages.Count == 0) return;
+
+        using var existing = await api.SelectAsync("ft_program_icons", "select=identifier", token);
+        var known = existing.RootElement.EnumerateArray()
+            .Select(e => e.GetProperty("identifier").GetString())
+            .ToHashSet();
+
+        var icons = snapshot.Packages
+            .Where(p => !known.Contains(p.Key))
+            .Select(p => (Identifier: p.Key, Icon: UsageCollector.IconPng(context, p.Value)))
+            .Where(i => i.Icon != null)
+            .Select(i => new { identifier = i.Identifier, icon = SupabaseApi.ToBytea(i.Icon!) })
+            .ToList();
+        if (icons.Count > 0)
+            await api.UpsertAsync("ft_program_icons", "identifier", icons, token, ignoreDuplicates: true);
     }
 }
