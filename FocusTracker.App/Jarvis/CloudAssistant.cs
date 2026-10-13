@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace FocusTracker.App.Jarvis
 {
-    // Режим «мозок у хмарі»: перевірки й чат виконує функція Supabase (supabase/functions/assistant).
+    // Асистент у хмарі: перевірки й чат виконує функція Supabase (supabase/functions/assistant).
     // Застосунок відправляє їй присутність і недавню активність, показує її повідомлення
     // й застосовує спільний для всіх пристроїв фокус-режим.
     public class CloudAssistant
@@ -57,9 +57,26 @@ namespace FocusTracker.App.Jarvis
         // Стан функції в хмарі: коли запускалась і чи була помилка
         public CloudAssistantState? State { get; private set; }
 
-        // Хмарний режим діє, лише коли асистента увімкнено й налаштовано синхронізацію
-        public bool IsActive => _settings.Current is { JarvisEnabled: true, AssistantInCloud: true, CloudSyncEnabled: true } s
+        // Асистент живе лише в хмарі: працює, коли його увімкнено й налаштовано синхронізацію
+        public bool IsActive => _settings.Current is { JarvisEnabled: true, CloudSyncEnabled: true } s
             && CloudCredentials.Unprotect(s.CloudConnectionProtected) != null;
+
+        // Для якого рядка підключення вже налаштовано розклад, тригер чату й налаштування в хмарі
+        private string? _setupDoneFor;
+
+        // Розклад pg_cron, тригер чату й налаштування асистента в базі. Ідемпотентно, тож робимо
+        // при першому обміні після запуску, після зміни бази та після збереження налаштувань.
+        private async Task EnsureSetupAsync(CloudStore store, string connection, CancellationToken token)
+        {
+            if (_setupDoneFor == connection) return;
+
+            var functionUrl = SupabaseProject.GetFunctionUrl(connection)
+                ?? throw new InvalidOperationException("Не вдалося визначити проєкт Supabase з рядка підключення. Потрібен Session pooler (користувач postgres.<ref>).");
+            await store.SetupAssistantAsync(functionUrl, token);
+            await store.UploadAssistantSettingsAsync(AssistantCloudSettings.ToJson(_settings.Current, TimeZoneInfo.Local), token);
+            _setupDoneFor = connection;
+            AppLog.Info($"{AssistantInfo.Name}: хмару налаштовано ({functionUrl})");
+        }
 
         public void Start(Func<(DateTime LastInput, string App)> presence, CancellationToken token)
         {
@@ -87,6 +104,7 @@ namespace FocusTracker.App.Jarvis
             {
                 var store = Store();
                 if (store == null) return;
+                await EnsureSetupAsync(store, Connection()!, token);
 
                 if (DateTime.Now - _lastUploadAt >= UploadInterval - TimeSpan.FromSeconds(5))
                 {
@@ -248,21 +266,31 @@ namespace FocusTracker.App.Jarvis
             return null;
         }
 
-        // Налаштування асистента для функції; відправляються при збереженні
+        // Після «Зберегти»: налаштування асистента й розклад у хмарі (на випадок нової бази)
         public async Task UploadSettingsAsync()
         {
             var store = Store() ?? throw new InvalidOperationException("Синхронізацію з хмарою не налаштовано.");
-            await store.UploadAssistantSettingsAsync(AssistantCloudSettings.ToJson(_settings.Current, TimeZoneInfo.Local));
+            await _gate.WaitAsync();
+            try
+            {
+                _setupDoneFor = null;
+                await EnsureSetupAsync(store, Connection()!, CancellationToken.None);
+            }
+            finally
+            {
+                _gate.Release();
+            }
         }
 
         public static JarvisNote ToNote(CloudAssistantMessage message) =>
             new(message.CreatedAtUtc.ToLocalTime(), message.Kind, message.Text);
 
+        private string? Connection() => CloudCredentials.Unprotect(_settings.Current.CloudConnectionProtected);
+
         private CloudStore? Store()
         {
-            var s = _settings.Current;
-            var connection = CloudCredentials.Unprotect(s.CloudConnectionProtected);
-            return s.CloudSyncEnabled && connection != null ? new CloudStore(connection) : null;
+            var connection = Connection();
+            return _settings.Current.CloudSyncEnabled && connection != null ? new CloudStore(connection) : null;
         }
     }
 }

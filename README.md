@@ -74,31 +74,26 @@ user.
 
 ## Jarvis
 
-A productivity assistant built on the Claude API («Налаштування» → «Коуч»: enable it, paste an
-Anthropic API key, write goals in priority order, productive hours and optional rules).
+A productivity assistant built on the Claude API that runs in the cloud: the Supabase Edge
+Function `supabase/functions/assistant`, woken by `pg_cron` every 5 minutes and by a trigger on new
+chat messages. It is shared by all devices and keeps working while any particular PC is off.
+Cloud sync must be configured; in «Налаштування» → «Коуч» enable it and write goals in priority
+order, productive hours and optional rules. The Anthropic API key lives only in Supabase
+(Edge Functions → Secrets). One-time setup of the function: `supabase/README.md`.
 
-- During productive hours, while the user is at this device, it checks every N minutes: the
-  context is the goals, rules, programs and window titles of the last hour on this device
-  (kept in memory only), today's statistics of all devices and open tasks. Claude answers with
-  a structured decision: nothing, a nudge, a question, a plan or a focus mode.
-- At the start of productive hours it proposes a plan for the day, at the end it sums the day up.
+- The app uploads presence and the programs and window titles in focus (kept 3 hours), sets up
+  the cron job and chat trigger on its first sync and after «Зберегти», shows the function's
+  messages and applies the shared focus mode.
+- During productive hours, while the user is at some device, the function checks every N minutes
+  against the goals and answers with nothing, a nudge, a question, a plan or a focus mode. At the
+  start of productive hours it proposes a plan, at the end it sums the day up.
 - Messages appear in the bottom-right corner on top of other windows; «Відповісти» opens the
-  «Коуч» page with a chat.
-- Focus mode (if allowed) closes the listed distracting programs until it ends, through the same
-  warn-then-close mechanism as restrictions. It can be stopped on the «Коуч» page.
+  «Коуч» page with the shared chat.
+- Focus mode (if allowed) closes the listed distracting programs on all devices until it ends,
+  through the same warn-then-close mechanism as restrictions.
 
-The key is stored in `settings.json` encrypted with DPAPI. Requests to Opus and Sonnet models use
-server-side refusal fallbacks (`fallbacks: "default"`).
-
+Requests to Opus and Sonnet models use server-side refusal fallbacks (`fallbacks: "default"`).
 The assistant's display name lives in one place, `FocusTracker.Domain/AssistantInfo.cs`.
-
-### Cloud brain
-
-With «Мозок у хмарі (Supabase)» on (and cloud sync configured) the checks and the chat run in the
-Supabase Edge Function `supabase/functions/assistant`, woken by `pg_cron` every 5 minutes and by a
-trigger on new chat messages. The assistant is then shared by all devices and keeps working while
-any particular PC is off; the app uploads presence and recent window titles (kept 3 hours), shows
-the function's messages, and applies the shared focus mode. One-time setup: `supabase/README.md`.
 
 ## Data
 
