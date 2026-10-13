@@ -282,11 +282,7 @@ namespace FocusTracker.App
 
         private void StartJarvis()
         {
-            var jarvis = Services.GetRequiredService<JarvisService>();
-            jarvis.NoteAdded += note => Dispatcher.Invoke(() => JarvisPopup.Show(note));
-            jarvis.Start(() => _presence!.IsPresent(_windowTracker.CurrentApp), _flushCts!.Token);
-
-            // Хмарний режим: повідомлення з хмари теж показуємо в кутку
+            // Асистент живе в хмарі; тут лише показуємо його повідомлення в кутку
             var cloud = Services.GetRequiredService<CloudAssistant>();
             cloud.NoteAdded += note => Dispatcher.Invoke(() => JarvisPopup.Show(note));
             cloud.Start(() => (_userActivity!.LastInputTime, _windowTracker.CurrentApp), _flushCts!.Token);
@@ -393,8 +389,6 @@ namespace FocusTracker.App
             services.AddSingleton<ComputerTimeService>();
             services.AddSingleton<RecentActivityLog>();
             services.AddSingleton<FocusMode>();
-            services.AddSingleton<JarvisContext>();
-            services.AddSingleton<JarvisService>();
             services.AddSingleton<CloudAssistant>();
             services.AddSingleton<CloudSyncRunner>();
             services.AddSingleton<IRestrictionEvaluator, RestrictionEvaluator>();

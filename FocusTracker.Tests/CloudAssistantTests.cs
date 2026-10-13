@@ -52,7 +52,6 @@ public class AssistantCloudSettingsTests
             JarvisMayStartFocus = false,
             JarvisModel = "claude-sonnet-5-5",
             JarvisEnabled = true,
-            AssistantInCloud = true,
         };
 
         using var doc = JsonDocument.Parse(AssistantCloudSettings.ToJson(settings, TimeZoneInfo.Utc));
@@ -70,9 +69,9 @@ public class AssistantCloudSettingsTests
     }
 
     [Fact]
-    public void Cloud_is_disabled_without_cloud_mode()
+    public void Cloud_is_disabled_when_assistant_is_off()
     {
-        var settings = new AppSettings { JarvisEnabled = true, AssistantInCloud = false };
+        var settings = new AppSettings { JarvisEnabled = false };
         using var doc = JsonDocument.Parse(AssistantCloudSettings.ToJson(settings, TimeZoneInfo.Utc));
         Assert.False(doc.RootElement.GetProperty("enabled").GetBoolean());
     }

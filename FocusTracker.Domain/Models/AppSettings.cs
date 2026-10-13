@@ -26,9 +26,6 @@ public class AppSettings
 
     public bool JarvisEnabled { get; set; }
 
-    // Ключ Anthropic API, зашифрований DPAPI для поточного користувача Windows
-    public string? AnthropicKeyProtected { get; set; }
-
     public string JarvisModel { get; set; } = DefaultJarvisModel;
 
     // Цілі та пріоритети своїми словами — Джарвіс оцінює поведінку відносно них
@@ -45,10 +42,6 @@ public class AppSettings
 
     // Чи може Джарвіс сам вмикати фокус-режим, що закриває відволікаючі програми
     public bool JarvisMayStartFocus { get; set; } = true;
-
-    // «Мозок у хмарі»: перевірки й чат виконує функція Supabase, а не цей застосунок.
-    // Працює, лише коли налаштована синхронізація з хмарою.
-    public bool AssistantInCloud { get; set; }
 
     public AppSettings Clone() => (AppSettings)MemberwiseClone();
 
