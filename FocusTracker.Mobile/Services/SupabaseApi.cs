@@ -79,6 +79,23 @@ public class SupabaseApi
         await EnsureSuccessAsync(response);
     }
 
+    public async Task UpdateAsync(string table, string filter, object values, string accessToken)
+    {
+        using var request = Request(HttpMethod.Patch, $"{table}?{filter}", accessToken);
+        request.Content = JsonContent.Create(values, options: Json);
+        request.Headers.Add("Prefer", "return=minimal");
+        using var response = await Http.SendAsync(request);
+        await EnsureSuccessAsync(response);
+    }
+
+    // filter — умова PostgREST, напр. "device_id=eq.<id>"
+    public async Task DeleteAsync(string table, string filter, string accessToken)
+    {
+        using var request = Request(HttpMethod.Delete, $"{table}?{filter}", accessToken);
+        using var response = await Http.SendAsync(request);
+        await EnsureSuccessAsync(response);
+    }
+
     // Вставка з поверненням вказаних стовпців нового рядка
     public async Task<JsonDocument> InsertReturningAsync(string table, object row, string accessToken, string select)
     {

@@ -121,6 +121,34 @@ public class CloudSyncTests
     }
 
     [Fact]
+    public async Task Devices_removed_from_cloud_are_removed_locally()
+    {
+        using var db = new TestDb();
+        var sync = new CloudSyncService(db);
+        await sync.ApplyRemoteRowsAsync(new[] { Row("youtube", 10, 600) });
+        await sync.ApplyRemoteActivityAsync(new[] { (Laptop, Today, new byte[180]) });
+
+        await sync.RemoveGoneDevicesAsync(new HashSet<Guid> { Guid.NewGuid() });
+
+        using var ctx = db.CreateDbContext();
+        Assert.Empty(ctx.RemoteHourlyUsages);
+        Assert.Empty(ctx.RemoteActivityDays);
+    }
+
+    [Fact]
+    public async Task Devices_still_in_cloud_are_kept()
+    {
+        using var db = new TestDb();
+        var sync = new CloudSyncService(db);
+        await sync.ApplyRemoteRowsAsync(new[] { Row("youtube", 10, 600) });
+
+        await sync.RemoveGoneDevicesAsync(new HashSet<Guid> { Laptop });
+
+        using var ctx = db.CreateDbContext();
+        Assert.Single(ctx.RemoteHourlyUsages);
+    }
+
+    [Fact]
     public async Task Local_usage_marks_rows_as_changed()
     {
         using var db = new TestDb();

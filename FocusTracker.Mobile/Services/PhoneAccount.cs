@@ -30,17 +30,28 @@ public class PhoneAccount
         private set => Preferences.Set("supabase.email", value);
     }
 
-    // Ідентифікатор телефону в ft_devices; створюється один раз
-    public Guid DeviceId
+    // Ідентифікатор телефону в ft_devices. Виводиться з ANDROID_ID, тож переживає перевстановлення
+    // (для того самого ключа підпису): інакше після кожного перевстановлення з'являвся б новий «Телефон»
+    // і його час дублювався зі старим.
+    public Guid DeviceId => StableDeviceId();
+
+    // Ідентифікатор, яким телефон користувався до стабільного (випадковий з першої версії), — його треба прибрати з хмари
+    public Guid? PreviousDeviceId =>
+        Guid.TryParse(Preferences.Get("device.id", ""), out var id) && id != DeviceId ? id : null;
+
+    public void ForgetPreviousDeviceId()
     {
-        get
-        {
-            var value = Preferences.Get("device.id", "");
-            if (Guid.TryParse(value, out var id)) return id;
-            id = Guid.NewGuid();
-            Preferences.Set("device.id", id.ToString());
-            return id;
-        }
+        Preferences.Remove("device.id");
+        // Токен push був прив'язаний до старого запису й видалився разом із ним — відправимо знову
+        Preferences.Remove("push.token_uploaded");
+    }
+
+    private static Guid StableDeviceId()
+    {
+        var androidId = global::Android.Provider.Settings.Secure.GetString(
+            global::Android.App.Application.Context.ContentResolver, global::Android.Provider.Settings.Secure.AndroidId) ?? "unknown";
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("focustracker:" + androidId));
+        return new Guid(hash.AsSpan(0, 16));
     }
 
     public string DeviceName

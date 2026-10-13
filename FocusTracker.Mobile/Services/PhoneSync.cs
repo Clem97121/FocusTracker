@@ -81,6 +81,15 @@ public class PhoneSync
                 }
             }, token);
 
+            // Дані вже лежать під стабільним ідентифікатором — старий запис телефону більше не потрібен
+            if (_account.PreviousDeviceId is { } previous)
+            {
+                await api.DeleteAsync("ft_presence", $"device_id=eq.{previous}", token);
+                await api.DeleteAsync("ft_devices", $"device_id=eq.{previous}", token);
+                _account.ForgetPreviousDeviceId();
+            }
+
+            await FocusState.RefreshAsync(_account);
             await UploadIconsAsync(api, token, snapshot, context);
             await PushService.UploadTokenAsync(api, token, device);
 
