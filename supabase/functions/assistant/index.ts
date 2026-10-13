@@ -5,7 +5,8 @@
 //   {"reason":"chat"} — тригер на нове повідомлення користувача в ft_assistant_messages.
 // Виклик без правильного заголовка x-ft-secret (ft_assistant_state.cron_secret) відхиляється.
 //
-// Секрети функції: ANTHROPIC_API_KEY (задає користувач), SUPABASE_DB_URL (дає Supabase).
+// Секрети функції: ANTHROPIC_API_KEY (задає користувач), SUPABASE_DB_URL (дає Supabase),
+// FIREBASE_SERVICE_ACCOUNT (необов'язковий: push на телефони, див. push.ts).
 
 import Anthropic from "npm:@anthropic-ai/sdk@0.128.0";
 import type {
@@ -17,6 +18,7 @@ import type {
   MessageCreateParamsNonStreaming,
 } from "npm:@anthropic-ai/sdk@0.128.0/resources/beta/messages/messages";
 import postgres from "npm:postgres@3.4.9";
+import { pushMessage } from "./push.ts";
 
 // Від імені асистента пишуться задачі в ft_entities (updated_by). Пристрої завантажують
 // рядки з updated_by ≠ свого id, тож задача з'являється на всіх.
@@ -438,9 +440,11 @@ async function executeTool(name: string, input: Record<string, unknown>, s: Sett
       const text = String(input.text ?? "").trim();
       if (!["nudge", "ask", "plan", "review"].includes(kind)) throw new Error(`Невідомий kind: ${kind}`);
       if (!text) throw new Error("Порожнє повідомлення");
-      await sql`
+      const [sent] = await sql`
         insert into public.ft_assistant_messages (role, kind, text, target_device_id, status)
-        values ('assistant', ${kind}, ${text}, ${target}, 'done')`;
+        values ('assistant', ${kind}, ${text}, ${target}, 'done')
+        returning id`;
+      await pushMessage(sql, { id: Number(sent.id), kind, text, target });
       return "Надіслано.";
     }
     case "add_task":
@@ -459,9 +463,12 @@ async function executeTool(name: string, input: Record<string, unknown>, s: Sett
         set until = now() + make_interval(mins => ${minutes}), reason = ${message},
             apps = ${sql.array(apps)}, updated_at = now()
         where id = 1`;
-      await sql`
+      const [sent] = await sql`
         insert into public.ft_assistant_messages (role, kind, text, target_device_id, status)
-        values ('assistant', 'focus', ${message}, ${target}, 'done')`;
+        values ('assistant', 'focus', ${message}, ${target}, 'done')
+        returning id`;
+      // Фокус-режим спільний, тож про нього знають усі телефони
+      await pushMessage(sql, { id: Number(sent.id), kind: "focus", text: message, target: null });
       return `Фокус-режим увімкнено на ${minutes} хв; блокуються: ${apps.join(", ")}.`;
     }
     case "remember": {

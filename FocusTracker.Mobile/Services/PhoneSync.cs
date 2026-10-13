@@ -82,6 +82,7 @@ public class PhoneSync
             }, token);
 
             await UploadIconsAsync(api, token, snapshot, context);
+            await PushService.UploadTokenAsync(api, token, device);
 
             // Нові втручання Коуча — сповіщеннями (поки без push, разом із синхронізацією)
             try
