@@ -24,17 +24,35 @@ namespace FocusTracker.Mobile.Platforms.Android;
 public class FocusBlockerService : AccessibilityService
 {
     private View? _overlay;
+    private string? _overlayPackage;
 
     public override void OnAccessibilityEvent(AccessibilityEvent? e)
     {
         if (e?.EventType != EventTypes.WindowStateChanged) return;
         var package = e.PackageName?.ToString();
-        if (string.IsNullOrEmpty(package) || package == PackageName || !FocusState.IsActive) return;
+        if (string.IsNullOrEmpty(package) || package == PackageName) return;
+        if (!FocusState.IsActive)
+        {
+            HideOverlay();
+            return;
+        }
+        // Заглушка вже показана, а системні вікна (шторка, клавіатура) дають свої події — не перемальовуємо
+        if (_overlay != null && package == _overlayPackage) return;
 
         var label = Label(package);
-        if (!FocusState.Blocks(label, package)) return;
+        if (!FocusState.Blocks(label, package))
+        {
+            // Користувач перейшов в іншу програму (напр. жестом «додому») — заглушка там не потрібна.
+            // Шторка й клавіатура теж дають події, на них заглушку не прибираємо.
+            if (_overlay != null && package != "com.android.systemui" && !package.Contains("inputmethod")
+                && !package.Contains("honeyboard"))
+                HideOverlay();
+            return;
+        }
+        _overlayPackage = package;
 
-        PerformGlobalAction(GlobalAction.Home);
+        // Заглушка одразу поверх заблокованої програми (вона під нею не реагує на дотики).
+        // Якщо спершу перейти на робочий стіл, його анімація перекриває заглушку.
         ShowOverlay(label);
     }
 
@@ -60,7 +78,11 @@ public class FocusBlockerService : AccessibilityService
             layout.AddView(Text(FocusState.Reason, 16, Color.ParseColor("#C8C8D0")));
 
         var ok = new Button(this) { Text = "Зрозуміло, повертаюсь до справ" };
-        ok.Click += (_, _) => HideOverlay();
+        ok.Click += (_, _) =>
+        {
+            PerformGlobalAction(GlobalAction.Home);
+            HideOverlay();
+        };
         layout.AddView(ok);
 
         // Свідоме рішення: зняти фокус на всіх пристроях (Коуч це побачить)
