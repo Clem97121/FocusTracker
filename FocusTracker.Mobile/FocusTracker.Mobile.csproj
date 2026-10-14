@@ -56,8 +56,8 @@
 
 	<!-- Конфігурація Firebase для push. Файл не в репозиторії: локально лежить поруч із клоном,
 	     у релізній збірці його записує workflow із секрету GOOGLE_SERVICES_JSON -->
-	<ItemGroup Condition="Exists('..\..\google-services.json')">
-		<GoogleServicesJson Include="..\..\google-services.json" />
+	<ItemGroup Condition="Exists('../../google-services.json')">
+		<GoogleServicesJson Include="../../google-services.json" />
 	</ItemGroup>
 
 </Project>

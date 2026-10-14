@@ -61,22 +61,37 @@ jobs:
         shell: pwsh
         run: vpk upload github --repoUrl $env:REPO_URL --publish --releaseName "FocusTracker $env:VERSION" --tag $env:TAG --token $env:GH_TOKEN
 
-  # APK для телефону — у той самий реліз; застосунок на телефоні знаходить його й оновлюється
+  # APK для телефону — у той самий реліз; застосунок на телефоні знаходить його й оновлюється.
+  # Збирається паралельно з ПК; .NET з Android-інструментами береться з кешу (див. android.yml).
   android:
-    needs: release
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     env:
       TAG: ${{ github.ref_name }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+      DOTNET_INSTALL_DIR: /home/runner/.dotnet-maui
+      DOTNET_SDK_VERSION: 10.0.401
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache .NET SDK with MAUI Android
+        id: dotnet-cache
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.dotnet-maui
+          key: dotnet-${{ env.DOTNET_SDK_VERSION }}-maui-android-linux-v1
+
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: ${{ env.DOTNET_SDK_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-mobile-${{ hashFiles('FocusTracker.Mobile/FocusTracker.Mobile.csproj') }}
 
       - uses: actions/setup-java@v4
         with:
@@ -84,17 +99,17 @@ jobs:
           java-version: '17'
 
       - name: Install MAUI Android workload
+        if: steps.dotnet-cache.outputs.cache-hit != 'true'
         run: dotnet workload install maui-android
 
       - name: Android SDK
-        shell: pwsh
-        run: dotnet build FocusTracker.Mobile/FocusTracker.Mobile.csproj -t:InstallAndroidDependencies -f net10.0-android "-p:AndroidSdkDirectory=$env:ANDROID_HOME" -p:AcceptAndroidSDKLicenses=True
+        run: dotnet build FocusTracker.Mobile/FocusTracker.Mobile.csproj -t:InstallAndroidDependencies -f net10.0-android "-p:AndroidSdkDirectory=$ANDROID_HOME" -p:AcceptAndroidSDKLicenses=True
 
       - name: Publish APK
         shell: pwsh
         run: |
           # Конфігурація Firebase для push: csproj шукає її поруч із клоном
-          if ($env:GOOGLE_SERVICES_JSON) { Set-Content -Path (Join-Path $env:GITHUB_WORKSPACE '..\google-services.json') -Value $env:GOOGLE_SERVICES_JSON -NoNewline }
+          if ($env:GOOGLE_SERVICES_JSON) { Set-Content -Path (Join-Path $env:GITHUB_WORKSPACE '../google-services.json') -Value $env:GOOGLE_SERVICES_JSON -NoNewline }
           $version = $env:TAG.TrimStart('v')
           $parts = $version.Split('.') | ForEach-Object { [int]$_ }
           # versionCode Android має зростати з кожною версією: 1.0.12 → 10012
@@ -115,5 +130,11 @@ jobs:
           $apk = Get-ChildItem out/android -Filter '*-Signed.apk' | Select-Object -First 1
           Copy-Item $apk.FullName out/FocusTracker-android.apk
 
+      # Реліз створює job release (vpk); якщо APK готовий раніше, чекаємо на нього
       - name: Upload APK
-        run: gh release upload ${{ github.ref_name }} out/FocusTracker-android.apk --clobber
+        run: |
+          for i in $(seq 1 60); do
+            gh release view "$TAG" > /dev/null 2>&1 && break
+            sleep 15
+          done
+          gh release upload "$TAG" out/FocusTracker-android.apk --clobber
