@@ -1,4 +1,4 @@
-﻿using FocusTracker.Domain;
+using FocusTracker.Domain;
 namespace FocusTracker.Domain.Models;
 
 public class TrackedProgram : ObservableObject
@@ -9,7 +9,7 @@ public class TrackedProgram : ObservableObject
     public string Name
     {
         get => _name;
-        set => Set(ref _name, value);
+        set { if (Set(ref _name, value)) RaisePropertyChanged(nameof(Title)); }
     }
 
     private string _identifier = string.Empty;
@@ -52,8 +52,12 @@ public class TrackedProgram : ObservableObject
     public string? DisplayName
     {
         get => _displayName;
-        set => Set(ref _displayName, value);
+        set { if (Set(ref _displayName, value)) RaisePropertyChanged(nameof(Title)); }
     }
+
+    // Назва для інтерфейсу: опис з exe, а якщо його немає (програма з телефона чи іншого ПК) — ім'я процесу/програми
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string Title => string.IsNullOrWhiteSpace(DisplayName) ? Name : DisplayName;
 
     private byte[]? _iconBytes;
     public byte[]? IconBytes

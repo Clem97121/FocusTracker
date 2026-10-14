@@ -81,7 +81,7 @@
                                     <StackPanel Orientation="Horizontal">
                                         <Image Width="16" Height="16" Margin="0 0 6 0"
                                                Source="{Binding IconBytes, Converter={StaticResource ByteArrayToImageConverter}}"/>
-                                        <TextBlock Text="{Binding DisplayName}"/>
+                                        <TextBlock Text="{Binding Title}"/>
                                     </StackPanel>
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
@@ -100,7 +100,7 @@
                                             <Image Width="16" Height="16"
                                                    Margin="0 0 4 0"
                                                    Source="{Binding IconBytes, Converter={StaticResource ByteArrayToImageConverter}}"/>
-                                            <TextBlock Text="{Binding DisplayName}" Foreground="White"/>
+                                            <TextBlock Text="{Binding Title}" Foreground="White"/>
                                             <Button Content="✖"
                                                     Width="20" Height="20"
                                                     Padding="0"
@@ -151,7 +151,7 @@
                                                     <StackPanel Orientation="Horizontal">
                                                         <Image Width="14" Height="14" Margin="0 0 4 0"
                                                                Source="{Binding IconBytes, Converter={StaticResource ByteArrayToImageConverter}}"/>
-                                                        <TextBlock Text="{Binding DisplayName}" FontSize="11" Foreground="White"/>
+                                                        <TextBlock Text="{Binding Title}" FontSize="11" Foreground="White"/>
                                                     </StackPanel>
                                                 </Border>
                                             </DataTemplate>
@@ -215,7 +215,7 @@
                                   Width="160">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding DisplayName}" />
+                                    <TextBlock Text="{Binding Title}" />
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
@@ -267,7 +267,7 @@
                                        Margin="0 0 4 0"
                                        Source="{Binding IconBytes,
                                                  Converter={StaticResource ByteArrayToImageConverter}}"/>
-                                                            <TextBlock Text="{Binding DisplayName}"
+                                                            <TextBlock Text="{Binding Title}"
                                            FontSize="11"
                                            Foreground="White"/>
                                                         </StackPanel>
