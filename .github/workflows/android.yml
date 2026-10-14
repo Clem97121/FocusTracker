@@ -1,0 +1,55 @@
+name: android
+
+# Перевірка, що застосунок для телефону збирається (без підпису) — лише коли змінювався його код.
+# .NET SDK разом із MAUI Android береться з кешу: на чистій машині їх встановлення займає ~7 хвилин.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'FocusTracker.Mobile/**'
+      - '.github/workflows/android.yml'
+  pull_request:
+    paths:
+      - 'FocusTracker.Mobile/**'
+      - '.github/workflows/android.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_INSTALL_DIR: /home/runner/.dotnet-maui
+      DOTNET_SDK_VERSION: 10.0.401
+    steps:
+      - uses: actions/checkout@v4
+
+      # Той самий ключ кешу, що й у release.yml: кеш спільний
+      - name: Cache .NET SDK with MAUI Android
+        id: dotnet-cache
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.dotnet-maui
+          key: dotnet-${{ env.DOTNET_SDK_VERSION }}-maui-android-linux-v1
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_SDK_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-mobile-${{ hashFiles('FocusTracker.Mobile/FocusTracker.Mobile.csproj') }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: '17'
+
+      - name: Install MAUI Android workload
+        if: steps.dotnet-cache.outputs.cache-hit != 'true'
+        run: dotnet workload install maui-android
+
+      - name: Build
+        run: |
+          dotnet build FocusTracker.Mobile/FocusTracker.Mobile.csproj -t:InstallAndroidDependencies -f net10.0-android "-p:AndroidSdkDirectory=$ANDROID_HOME" -p:AcceptAndroidSDKLicenses=True
+          dotnet build FocusTracker.Mobile/FocusTracker.Mobile.csproj -f net10.0-android -c Release "-p:AndroidSdkDirectory=$ANDROID_HOME" -p:AndroidPackageFormats=apk
