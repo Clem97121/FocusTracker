@@ -20,6 +20,7 @@ import type {
 import postgres from "npm:postgres@3.4.9";
 import { pushMessage } from "./push.ts";
 import { describeRestrictions, entityTools, executeEntityTool } from "./entities.ts";
+import { CONSOLIDATE_TASK, describeMemory, ensureMemorySchema, executeMemoryTool, journalTool, memoryTools } from "./memory.ts";
 
 // Від імені асистента пишуться задачі в ft_entities (updated_by). Пристрої завантажують
 // рядки з updated_by ≠ свого id, тож задача з'являється на всіх.
@@ -27,13 +28,12 @@ const CLOUD_ASSISTANT_ID = "00000000-0000-4000-8000-0000a5515700";
 const FOCUS_TRACKER_APP = "focustracker.app";
 const MAX_FOCUS_MINUTES = 180;
 const ACTIVE_WINDOW_MINUTES = 10;
-const MEMORY_MAX_CHARS = 4000;
 const MAX_TOOL_ROUNDS = 6;
 
 const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { max: 3, prepare: false });
 const anthropic = new Anthropic(); // ключ — з ANTHROPIC_API_KEY
 
-type Kind = "check" | "plan" | "review" | "chat";
+type Kind = "check" | "plan" | "review" | "chat" | "consolidate";
 
 interface Settings {
   goals: string;
@@ -155,12 +155,14 @@ async function tick(): Promise<string> {
 
     const settings = await loadSettings();
     if (!settings?.enabled) return "disabled";
+    await ensureMemorySchema(sql);
 
     const now = new Date();
     const local = zoned(now, settings.timeZone);
     const productive = local.hour >= settings.fromHour && local.hour < settings.toHour;
     const [state] = await sql`
-      select plan_date::text as plan_date, review_date::text as review_date, last_check_at
+      select plan_date::text as plan_date, review_date::text as review_date, last_check_at,
+             consolidated_date is null or consolidated_date <= ${local.date}::date - 7 as consolidate_due
       from public.ft_assistant_state where id = 1`;
     const active = await activeDevice();
 
@@ -180,6 +182,12 @@ async function tick(): Promise<string> {
       await sql`update public.ft_assistant_state set review_date = ${local.date}::date where id = 1`;
       await run("review", settings, active);
       return "review";
+    }
+    // Раз на тиждень, після вечірнього підсумку — переробка пам'яті
+    if (!productive && state.review_date === local.date && state.consolidate_due) {
+      await sql`update public.ft_assistant_state set consolidated_date = ${local.date}::date where id = 1`;
+      await run("consolidate", settings, active);
+      return "consolidate";
     }
     return "idle";
   });
@@ -238,8 +246,10 @@ function systemPrompt(name: string): string {
   містить конкретний крок, якого ще немає серед відкритих задач.
 - Навички (add_skill), обмеження (add_restriction) і видалення задач чи обмежень — лише коли користувач
   про це просить або явно погодився на твою пропозицію. Перед видаленням переконайся, що зрозумів, що саме.
-- Важливі довгострокові спостереження про користувача (що працює, що ні, домовленості)
-  зберігай через remember — вони будуть у твоїй пам'яті наступними днями.
+- Ти поступово пізнаєш користувача. Важливе довгострокове (факти про нього, що працює, що ні,
+  домовленості) зберігай через remember у відповідний розділ профілю; якщо щось застаріло або
+  він просить забути — виправ через rewrite_profile_section. Дрібниці дня в профіль не пиши.
+  Про минулі дні, яких немає в контексті, шукай через search_journal.
 - Пиши тією мовою, якою користувач написав свої цілі.`;
 }
 
@@ -254,17 +264,18 @@ ${s.rules?.trim() || "(немає)"}
 Продуктивні години: ${pad(s.fromHour)}:00–${pad(s.toHour)}:00 (${s.timeZone}). Поза ними — особистий час.
 Фокус-режим вмикати ${s.mayStartFocus ? "дозволено" : "НЕ дозволено, лише пропонувати"}.
 
-## Твоя пам'ять із попередніх днів
-${memory.trim() || "(поки порожня)"}`;
+${memory}`;
 }
 
 const TASKS: Record<Exclude<Kind, "chat">, string> = {
+  consolidate: CONSOLIDATE_TASK,
   plan: "Почалися продуктивні години. Коротко привітайся і запропонуй план на сьогодні: 2–4 конкретні кроки під цілі з урахуванням задач. Надішли його через send_message з kind = plan.",
-  review: "Продуктивні години закінчились. Чесно й коротко підсумуй день: що зроблено для цілей, що ні, і одна порада на завтра. Надішли через send_message з kind = review. Потім збережи через remember 1–3 короткі спостереження, корисні на майбутнє (якщо є що зберегти).",
+  review: "Продуктивні години закінчились. Чесно й коротко підсумуй день: що зроблено для цілей, що ні, і одна порада на завтра. Надішли через send_message з kind = review. Потім запиши день у щоденник через write_journal (з урахуванням сьогоднішнього чату) і, якщо дізнався щось довгострокове, збережи через remember.",
   check: "Оціни, що відбувається, і виріши, чи потрібно втрутитися зараз. Якщо ні — не викликай жодного інструмента.",
 };
 
 function tools(kind: Kind, s: Settings): BetaTool[] {
+  if (kind === "consolidate") return memoryTools;
   const list: BetaTool[] = [];
   if (kind !== "chat") {
     list.push({
@@ -321,16 +332,8 @@ function tools(kind: Kind, s: Settings): BetaTool[] {
     });
   }
   list.push(...entityTools);
-  list.push({
-    name: "remember",
-    description: "Запам'ятати коротке довгострокове спостереження про користувача на наступні дні.",
-    input_schema: {
-      type: "object",
-      properties: { note: { type: "string", description: "Одне речення" } },
-      required: ["note"],
-      additionalProperties: false,
-    },
-  });
+  list.push(...memoryTools);
+  if (kind === "review") list.push(journalTool);
   return list;
 }
 
@@ -340,12 +343,14 @@ function supportsFallbacks(model: string): boolean {
 }
 
 async function run(kind: Kind, s: Settings, active: Presence | null) {
-  const [state] = await sql`select memory from public.ft_assistant_state where id = 1`;
+  await ensureMemorySchema(sql);
+  const today = zoned(new Date(), s.timeZone).date;
+  const memory = await describeMemory(sql, today);
   const context = await describeNow(s, active);
 
   const system: BetaTextBlockParam[] = [
     { type: "text", text: systemPrompt(s.name || "Коуч") },
-    { type: "text", text: profile(s, state?.memory ?? ""), cache_control: { type: "ephemeral" } },
+    { type: "text", text: profile(s, memory), cache_control: { type: "ephemeral" } },
   ];
 
   let messages: BetaMessageParam[];
@@ -386,7 +391,7 @@ async function run(kind: Kind, s: Settings, active: Presence | null) {
     for (const block of response.content) {
       if (block.type !== "tool_use") continue;
       try {
-        const output = await executeTool(block.name, block.input as Record<string, unknown>, s, target);
+        const output = await executeTool(block.name, block.input as Record<string, unknown>, s, target, today);
         results.push({ type: "tool_result", tool_use_id: block.id, content: output });
       } catch (e) {
         results.push({ type: "tool_result", tool_use_id: block.id, content: errorText(e), is_error: true });
@@ -438,7 +443,9 @@ async function chatHistory(): Promise<BetaMessageParam[]> {
 
 // ===================== Інструменти =====================
 
-async function executeTool(name: string, input: Record<string, unknown>, s: Settings, target: string | null): Promise<string> {
+async function executeTool(
+  name: string, input: Record<string, unknown>, s: Settings, target: string | null, today: string,
+): Promise<string> {
   switch (name) {
     case "send_message": {
       const kind = String(input.kind ?? "");
@@ -476,19 +483,8 @@ async function executeTool(name: string, input: Record<string, unknown>, s: Sett
       await pushMessage(sql, { id: Number(sent.id), kind: "focus", text: message, target: null });
       return `Фокус-режим увімкнено на ${minutes} хв; блокуються: ${apps.join(", ")}.`;
     }
-    case "remember": {
-      const note = String(input.note ?? "").trim();
-      if (!note) throw new Error("Порожня нотатка");
-      const [state] = await sql`select memory from public.ft_assistant_state where id = 1`;
-      const date = zoned(new Date(), s.timeZone);
-      let memory = `${(state?.memory ?? "").trim()}\n- ${date.date.slice(8, 10)}.${date.date.slice(5, 7)}: ${note}`.trim();
-      // Найстаріші нотатки відкидаємо цілими рядками
-      while (memory.length > MEMORY_MAX_CHARS && memory.includes("\n")) memory = memory.slice(memory.indexOf("\n") + 1);
-      await sql`update public.ft_assistant_state set memory = ${memory} where id = 1`;
-      return "Запам'ятав.";
-    }
     default: {
-      const result = await executeEntityTool(sql, name, input);
+      const result = await executeEntityTool(sql, name, input) ?? await executeMemoryTool(sql, name, input, today);
       if (result !== null) return result;
       throw new Error(`Невідомий інструмент ${name}`);
     }
