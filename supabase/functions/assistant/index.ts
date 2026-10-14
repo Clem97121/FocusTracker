@@ -19,6 +19,7 @@ import type {
 } from "npm:@anthropic-ai/sdk@0.128.0/resources/beta/messages/messages";
 import postgres from "npm:postgres@3.4.9";
 import { pushMessage } from "./push.ts";
+import { describeRestrictions, entityTools, executeEntityTool } from "./entities.ts";
 
 // Від імені асистента пишуться задачі в ft_entities (updated_by). Пристрої завантажують
 // рядки з updated_by ≠ свого id, тож задача з'являється на всіх.
@@ -235,6 +236,8 @@ function systemPrompt(name: string): string {
   телефона (YouTube, Instagram, TikTok…): щоб заблокувати їх і там, додай ці назви до списку apps.
 - Задачу додавай (add_task), лише коли це справді допоможе: користувач попросив або план дня
   містить конкретний крок, якого ще немає серед відкритих задач.
+- Навички (add_skill), обмеження (add_restriction) і видалення задач чи обмежень — лише коли користувач
+  про це просить або явно погодився на твою пропозицію. Перед видаленням переконайся, що зрозумів, що саме.
 - Важливі довгострокові спостереження про користувача (що працює, що ні, домовленості)
   зберігай через remember — вони будуть у твоїй пам'яті наступними днями.
 - Пиши тією мовою, якою користувач написав свої цілі.`;
@@ -317,6 +320,7 @@ function tools(kind: Kind, s: Settings): BetaTool[] {
       },
     });
   }
+  list.push(...entityTools);
   list.push({
     name: "remember",
     description: "Запам'ятати коротке довгострокове спостереження про користувача на наступні дні.",
@@ -483,8 +487,11 @@ async function executeTool(name: string, input: Record<string, unknown>, s: Sett
       await sql`update public.ft_assistant_state set memory = ${memory} where id = 1`;
       return "Запам'ятав.";
     }
-    default:
+    default: {
+      const result = await executeEntityTool(sql, name, input);
+      if (result !== null) return result;
       throw new Error(`Невідомий інструмент ${name}`);
+    }
   }
 }
 
@@ -590,6 +597,9 @@ async function describeNow(s: Settings, active: Presence | null): Promise<string
 
   out.push("## Задачі");
   out.push(await describeTasks(tz, local.date));
+
+  out.push("## Обмеження");
+  out.push(await describeRestrictions(sql));
 
   out.push("## Повідомлення сьогодні (твої й користувача)");
   const today = await sql`
