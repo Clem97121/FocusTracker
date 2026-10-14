@@ -23,6 +23,19 @@ public class PushService : FirebaseMessagingService
         var kind = data.TryGetValue("kind", out var k) ? k : "nudge";
         var coach = new CoachMessage(id, DateTime.UtcNow, "assistant", kind, text, null, "done", null);
         CoachNotifications.ShowOnce(this, coach);
+
+        // Фокус-режим починає діяти на телефоні одразу, а не з наступною синхронізацією
+        if (kind == "focus")
+        {
+            try
+            {
+                Task.Run(() => FocusState.RefreshAsync(new PhoneAccount())).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Focus refresh: {ex.Message}");
+            }
+        }
     }
 
     public override void OnNewToken(string token)

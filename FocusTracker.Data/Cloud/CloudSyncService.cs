@@ -310,6 +310,26 @@ namespace FocusTracker.Data.Cloud
                 local.LastSeenAt = device.LastSeenAtUtc.ToLocalTime();
             }
             await db.SaveChangesAsync(token);
+
+            await RemoveGoneDevicesAsync(devices.Select(d => d.DeviceId).ToHashSet(), token);
+        }
+
+        // Пристрій видалили з хмари (напр. дубль після перевстановлення) — прибираємо і його локальну копію,
+        // інакше його час і далі додавався б до статистики
+        public async Task RemoveGoneDevicesAsync(IReadOnlySet<Guid> cloudDevices, CancellationToken token = default)
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync(token);
+            var gone = (await db.RemoteDevices.Select(d => d.DeviceId).ToListAsync(token))
+                .Concat(await db.RemoteHourlyUsages.Select(r => r.DeviceId).Distinct().ToListAsync(token))
+                .Concat(await db.RemoteActivityDays.Select(r => r.DeviceId).Distinct().ToListAsync(token))
+                .Where(id => !cloudDevices.Contains(id))
+                .Distinct()
+                .ToList();
+            if (gone.Count == 0) return;
+
+            await db.RemoteHourlyUsages.Where(r => gone.Contains(r.DeviceId)).ExecuteDeleteAsync(token);
+            await db.RemoteActivityDays.Where(r => gone.Contains(r.DeviceId)).ExecuteDeleteAsync(token);
+            await db.RemoteDevices.Where(d => gone.Contains(d.DeviceId)).ExecuteDeleteAsync(token);
         }
 
         // Ключ-значення синхронізації (мітки часу, останні бачені id тощо); скидається разом із ResetAsync

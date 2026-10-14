@@ -11,6 +11,8 @@ public class MainPage : ContentPage
     private readonly Label _status = new() { TextColor = Colors.Gray };
     private readonly Button _permission = new() { Text = "Дати доступ до історії використання" };
     private readonly Button _sync = new() { Text = "Синхронізувати зараз" };
+    private readonly Button _blocker = new() { Text = "Увімкнути блокування у фокус-режимі" };
+    private readonly Label _focus = new() { TextColor = Color.FromArgb("#E0A040") };
     private readonly Entry _deviceName = new() { Placeholder = "Назва пристрою" };
     private readonly Label _total = new() { FontSize = 18, FontAttributes = FontAttributes.Bold };
     private readonly VerticalStackLayout _apps = new() { Spacing = 6 };
@@ -28,6 +30,14 @@ public class MainPage : ContentPage
         _sync.Clicked += async (_, _) => await SyncAndLoadAsync();
         _refresh.Command = new Command(async () => await SyncAndLoadAsync());
         _update.Clicked += async (_, _) => await InstallUpdateAsync();
+        _blocker.Clicked += async (_, _) =>
+        {
+            await DisplayAlertAsync("Блокування у фокус-режимі",
+                "У списку «Встановлені програми» відкрийте «FocusTracker: фокус-режим» і ввімкніть. " +
+                "Якщо Android пише «Обмежене налаштування»: Налаштування → Програми → FocusTracker → ⋮ → «Дозволити обмежені налаштування», і спробуйте ще раз.",
+                "Відкрити налаштування");
+            FocusBlockerService.OpenSettings(Platform.AppContext);
+        };
 
         ToolbarItems.Add(new ToolbarItem("Коуч", null, async () => await Navigation.PushAsync(new ChatPage())));
         MainActivity.OpenChat += () => MainThread.BeginInvokeOnMainThread(OpenChatIfRequested);
@@ -46,7 +56,7 @@ public class MainPage : ContentPage
                 Spacing = 12,
                 Children =
                 {
-                    _update, _status, _permission, _sync,
+                    _update, _status, _focus, _permission, _blocker, _sync,
                     new Label { Text = "Назва цього телефону", TextColor = Colors.Gray }, _deviceName,
                     new Label { Text = "Сьогодні на всіх пристроях", FontSize = 20, FontAttributes = FontAttributes.Bold, Margin = new Thickness(0, 12, 0, 0) },
                     _total, _apps,
@@ -125,6 +135,7 @@ public class MainPage : ContentPage
         _sync.IsEnabled = false;
         var hasPermission = UsageCollector.HasPermission(Platform.AppContext);
         _permission.IsVisible = !hasPermission;
+        _blocker.IsVisible = !FocusBlockerService.IsEnabled(Platform.AppContext);
         try
         {
             if (hasPermission)
@@ -142,6 +153,10 @@ public class MainPage : ContentPage
             return;
         }
 
+        _focus.Text = FocusState.IsActive
+            ? $"Фокус-режим до {FocusState.UntilUtc!.Value.ToLocalTime():HH:mm}: {string.Join(", ", FocusState.Apps)}"
+            : "";
+        _focus.IsVisible = FocusState.IsActive;
         _status.Text = hasPermission
             ? $"Синхронізовано о {PhoneSync.LastSyncAt:HH:mm}. Далі — автоматично кожні 15 хвилин."
             : "Щоб рахувати час на телефоні, дайте FocusTracker доступ до історії використання.";
