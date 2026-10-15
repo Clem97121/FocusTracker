@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace FocusTracker.Mobile.Services;
 
@@ -52,14 +52,5 @@ public static class FocusState
             : null;
         var apps = row.GetProperty("apps").EnumerateArray().Select(a => a.GetString() ?? "").Where(a => a.Length > 0);
         Set(until, row.GetProperty("reason").GetString() ?? "", apps);
-    }
-
-    // «Завершити фокус» на телефоні знімає його на всіх пристроях
-    public static async Task StopAsync(PhoneAccount account)
-    {
-        Set(null, "", Array.Empty<string>());
-        var token = await account.GetAccessTokenAsync();
-        await account.Api().UpdateAsync("ft_focus", "id=eq.1",
-            new { until = (DateTime?)null, apps = Array.Empty<string>(), updated_at = DateTime.UtcNow }, token);
     }
 }

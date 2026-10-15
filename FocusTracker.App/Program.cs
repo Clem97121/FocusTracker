@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Velopack;
 
 namespace FocusTracker.App
@@ -13,6 +13,13 @@ namespace FocusTracker.App
             VelopackApp.Build()
                 .OnBeforeUninstallFastCallback(_ => App.RemoveFromStartup())
                 .Run();
+
+            // Сторож фокус-режиму — та сама програма в окремому процесі, без вікон
+            if (args.Length > 0 && args[0] == Services.FocusWatchdog.WatchArg)
+            {
+                Services.FocusWatchdog.Run(args);
+                return;
+            }
 
             var app = new App();
             app.InitializeComponent();

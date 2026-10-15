@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using FocusTracker.Mobile.Services;
 
 namespace FocusTracker.Mobile.Pages;
@@ -107,7 +107,7 @@ public class ChatPage : ContentPage
         var at = message.CreatedAtUtc.ToLocalTime();
         var time = at.Date == DateTime.Today ? at.ToString("HH:mm") : at.ToString("dd.MM HH:mm");
         var header = message.Role == "user"
-            ? $"Ви · {time}"
+            ? (message.Kind == "event" ? $"Подія · {time}" : $"Ви · {time}")
             : message.Kind switch
             {
                 "focus" => $"Коуч · {time} · фокус-режим",

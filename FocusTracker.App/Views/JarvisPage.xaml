@@ -1,4 +1,4 @@
-<UserControl x:Class="FocusTracker.App.Views.JarvisPage"
+﻿<UserControl x:Class="FocusTracker.App.Views.JarvisPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="Transparent">
@@ -20,12 +20,19 @@
                         Margin="10 0 0 0"
                         Click="Memory_Click"
                         Style="{StaticResource AccentButtonStyle}"/>
-                <Button x:Name="StopFocusButton"
-                        Content="Завершити фокус-режим"
-                        Width="220" Height="30"
+                <Button x:Name="AskStopFocusButton"
+                        Content="Попросити зняти фокус"
+                        Width="200" Height="30"
                         Margin="10 0 0 0"
                         Visibility="Collapsed"
-                        Click="StopFocus_Click"
+                        Click="AskStopFocus_Click"
+                        Style="{StaticResource AccentButtonStyle}"/>
+                <Button x:Name="EmergencyStopButton"
+                        Content="Екстрено (через 10 хв)"
+                        Width="200" Height="30"
+                        Margin="10 0 0 0"
+                        Visibility="Collapsed"
+                        Click="EmergencyStop_Click"
                         Style="{StaticResource AccentButtonStyle}"/>
             </StackPanel>
         </StackPanel>

@@ -40,6 +40,9 @@ export async function ensureMemorySchema(sql: Sql) {
     alter table public.ft_coach_profile enable row level security;
     alter table public.ft_coach_journal enable row level security;
     alter table public.ft_assistant_state add column if not exists consolidated_date date;
+    alter table public.ft_assistant_messages drop constraint if exists ft_assistant_messages_kind_check;
+    alter table public.ft_assistant_messages add constraint ft_assistant_messages_kind_check
+      check (kind in ('chat', 'nudge', 'ask', 'plan', 'focus', 'review', 'event'));
     do $$ begin
       if to_regprocedure('public.ft_is_owner()') is not null then
         drop policy if exists ft_owner_read on public.ft_coach_profile;
