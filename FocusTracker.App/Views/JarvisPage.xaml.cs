@@ -126,10 +126,17 @@ namespace FocusTracker.App.Views
             StopFocusButton.Visibility = _focus.IsActive ? Visibility.Visible : Visibility.Collapsed;
             CheckNowButton.IsEnabled = _cloud.IsActive && !_sending;
             SendButton.IsEnabled = _cloud.IsActive && !_sending;
+            MemoryButton.IsEnabled = _cloud.IsActive;
         }
 
         // Перевірка на вимогу — просто питання в чаті
         private async void CheckNow_Click(object sender, RoutedEventArgs e) => await SendAsync("Що мені зараз робити?");
+
+        private void Memory_Click(object sender, RoutedEventArgs e)
+        {
+            if (Parent is ContentControl host)
+                host.Content = new CoachMemoryPage();
+        }
 
         private async void StopFocus_Click(object sender, RoutedEventArgs e)
         {

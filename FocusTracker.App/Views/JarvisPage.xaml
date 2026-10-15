@@ -14,6 +14,12 @@
                         Width="220" Height="30"
                         Click="CheckNow_Click"
                         Style="{StaticResource AccentButtonStyle}"/>
+                <Button x:Name="MemoryButton"
+                        Content="Що ти про мене знаєш"
+                        Width="220" Height="30"
+                        Margin="10 0 0 0"
+                        Click="Memory_Click"
+                        Style="{StaticResource AccentButtonStyle}"/>
                 <Button x:Name="StopFocusButton"
                         Content="Завершити фокус-режим"
                         Width="220" Height="30"

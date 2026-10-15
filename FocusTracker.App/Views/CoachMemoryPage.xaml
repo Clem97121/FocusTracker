@@ -1,0 +1,63 @@
+<UserControl x:Class="FocusTracker.App.Views.CoachMemoryPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+
+    <DockPanel Margin="20">
+
+        <StackPanel DockPanel.Dock="Top" Margin="0 0 0 10">
+            <StackPanel Orientation="Horizontal">
+                <Button Content="← До чату"
+                        Width="140" Height="30"
+                        Click="Back_Click"
+                        Style="{StaticResource AccentButtonStyle}"/>
+                <Button x:Name="SaveButton"
+                        Content="Зберегти зміни"
+                        Width="180" Height="30"
+                        Margin="10 0 0 0"
+                        Click="Save_Click"
+                        Style="{StaticResource AccentButtonStyle}"/>
+            </StackPanel>
+            <TextBlock x:Name="StatusText" Foreground="Gray" FontSize="13" TextWrapping="Wrap" Margin="0 10 0 0"
+                       Text="Це те, що Коуч пам'ятає про вас. Виправте чи зітріть що завгодно — він користуватиметься вашою версією."/>
+        </StackPanel>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="Профіль" FontSize="18" FontWeight="Bold" Foreground="White" Margin="0 0 0 6"/>
+                <ItemsControl x:Name="SectionItems">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0 6">
+                                <TextBlock Text="{Binding Title}" Foreground="Gray" FontSize="13" Margin="0 0 0 3"/>
+                                <TextBox Text="{Binding Content, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource TextBoxStyle}"
+                                         AcceptsReturn="True" TextWrapping="Wrap" MinHeight="40"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Text="Щоденник" FontSize="18" FontWeight="Bold" Foreground="White" Margin="0 20 0 6"/>
+                <TextBlock x:Name="JournalEmpty" Text="Записів ще немає: Коуч робить їх увечері, після підсумку дня."
+                           Foreground="Gray" FontSize="13" Visibility="Collapsed"/>
+                <ItemsControl x:Name="JournalItems">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel Margin="0 6">
+                                <TextBlock DockPanel.Dock="Top" Text="{Binding Header}" Foreground="Gray" FontSize="13" Margin="0 0 0 3"/>
+                                <Button DockPanel.Dock="Right" Content="Видалити"
+                                        Width="100" Height="30" Margin="10 0 0 0" VerticalAlignment="Top"
+                                        Click="DeleteDay_Click"
+                                        Style="{StaticResource AccentButtonStyle}"/>
+                                <TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource TextBoxStyle}"
+                                         AcceptsReturn="True" TextWrapping="Wrap" MinHeight="40"/>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>
