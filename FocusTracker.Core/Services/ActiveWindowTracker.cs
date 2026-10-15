@@ -1,4 +1,5 @@
-﻿using FocusTracker.Domain.Interfaces;
+﻿using FocusTracker.Domain;
+using FocusTracker.Domain.Interfaces;
 using FocusTracker.Core.Helpers;
 using System;
 using System.Diagnostics;
@@ -33,6 +34,9 @@ namespace FocusTracker.Core.Services
 
         // Заголовок вікна у фокусі (сайт у браузері, файл у редакторі тощо)
         public string CurrentTitle { get; private set; } = string.Empty;
+
+        // Браузер у фокусі (процес), якщо це браузер; CurrentApp тоді може бути сайтом
+        public string? CurrentBrowser { get; private set; }
 
         // Помилки з фонового таймера (інакше вони губляться або валять процес)
         public event Action<Exception>? Error;
@@ -88,6 +92,11 @@ namespace FocusTracker.Core.Services
         {
             string activeApp = GetActiveProcessName();
             CurrentTitle = GetActiveWindowTitle();
+            // Відомий сайт у браузері рахується окремо від браузера
+            var browser = SiteDetector.IsBrowser(activeApp) ? activeApp : null;
+            if (browser != null && SiteDetector.Detect(CurrentTitle) is { } site)
+                activeApp = site;
+            CurrentBrowser = browser;
             DateTime now = DateTime.Now;
             TimeSpan delta = now - _lastCheckTime;
             _lastCheckTime = now;
@@ -97,7 +106,8 @@ namespace FocusTracker.Core.Services
             if (activeApp != _currentApp)
             {
                 string exePath = GetActiveProcessPath();
-                string displayName = _resolver.Resolve(activeApp, exePath);
+                // У сайту немає свого exe: назва — сам сайт, значок — браузера
+                string displayName = browser != null && activeApp != browser ? activeApp : _resolver.Resolve(activeApp, exePath);
 
                 await _programService.UpdateDisplayNameIfNeededAsync(activeApp, displayName);
 

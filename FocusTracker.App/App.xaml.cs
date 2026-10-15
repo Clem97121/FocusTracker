@@ -326,7 +326,7 @@ namespace FocusTracker.App
                         {
                             await _presence!.RefreshIgnoreIdleAsync();
                             await _usageRecorder!.FlushAsync();
-                            await _usageRecorder.EnforceRestrictionsAsync(_windowTracker.CurrentApp);
+                            await _usageRecorder.EnforceRestrictionsAsync(_windowTracker.CurrentApp, _windowTracker.CurrentBrowser);
                         }
                         catch (Exception ex)
                         {
