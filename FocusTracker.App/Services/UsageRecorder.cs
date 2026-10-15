@@ -96,8 +96,11 @@ namespace FocusTracker.App.Services
 
         // Перевіряє обмеження для програми у фокусі: при порушенні спершу попереджає,
         // а закриває, лише якщо порушення триває довше за відстрочку
-        public async Task EnforceRestrictionsAsync(string appName)
+        // browser — процес браузера, якщо appName — сайт у ньому: тоді закриваємо вкладку, а не програму
+        public async Task EnforceRestrictionsAsync(string appName, string? browser = null)
         {
+            var isTab = browser != null && appName != browser;
+            var what = isTab ? "вкладку" : "програму";
             if (string.IsNullOrWhiteSpace(appName) || appName == "Unknown") return;
 
             var statService = _services.GetRequiredService<IAppUsageStatService>();
@@ -123,18 +126,24 @@ namespace FocusTracker.App.Services
             {
                 AppLog.Info($"Попереджено про закриття {appName}: {string.Join("; ", notes)}");
                 notifier.ShowMessage(
-                    $"Ліміт для \"{appName}\" вичерпано, програму буде закрито через {_gracePeriod.Delay.TotalSeconds:0} с — збережи роботу.\n• {string.Join("\n• ", notes)}",
+                    $"Ліміт для \"{appName}\" вичерпано, {what} буде закрито через {_gracePeriod.Delay.TotalSeconds:0} с — збережи роботу.\n• {string.Join("\n• ", notes)}",
                     "Обмеження перевищено");
                 return;
             }
 
             if (action != RestrictionAction.Close) return;
 
-            var processes = Process.GetProcessesByName(appName);
-            foreach (var proc in processes)
+            if (isTab)
             {
-                try { proc.Kill(); }
-                catch (Exception ex) { AppLog.Error($"Не вдалося закрити {appName}", ex); }
+                BrowserTab.CloseActive(browser!);
+            }
+            else
+            {
+                foreach (var proc in Process.GetProcessesByName(appName))
+                {
+                    try { proc.Kill(); }
+                    catch (Exception ex) { AppLog.Error($"Не вдалося закрити {appName}", ex); }
+                }
             }
 
             var cacheKey = $"{appName}_{string.Join(",", notes)}";
@@ -143,7 +152,7 @@ namespace FocusTracker.App.Services
 
             _violationCache[cacheKey] = DateTime.Now;
             AppLog.Info($"Закрито {appName}: {string.Join("; ", notes)}");
-            var message = $"Програму \"{appName}\" було закрито через перевищення обмеження:\n• {string.Join("\n• ", notes)}";
+            var message = $"{(isTab ? "Вкладку" : "Програму")} \"{appName}\" було закрито через перевищення обмеження:\n• {string.Join("\n• ", notes)}";
             notifier.ShowMessage(message, "Обмеження перевищено");
         }
     }
