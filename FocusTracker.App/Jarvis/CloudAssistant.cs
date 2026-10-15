@@ -244,6 +244,10 @@ namespace FocusTracker.App.Jarvis
             return await store.GetRecentMessagesAsync(count);
         }
 
+        // Для сторінки пам'яті Коуча
+        public CloudStore RequireStore() =>
+            Store() ?? throw new InvalidOperationException("Синхронізацію з хмарою не налаштовано.");
+
         // Повідомлення в чат; відповідь пише функція, яку будить тригер у базі
         public async Task<long> SendAsync(string text)
         {
