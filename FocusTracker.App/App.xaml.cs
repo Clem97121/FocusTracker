@@ -41,6 +41,7 @@ namespace FocusTracker.App
         private CancellationTokenSource? _flushCts;
 
         private Mutex? _mutex;
+        private bool _restartedInFocus;
         private bool _ownsMutex;
         private string _dbPath = "";
 
@@ -142,6 +143,7 @@ namespace FocusTracker.App
 
 
             base.OnStartup(e);
+            _restartedInFocus = Array.IndexOf(e.Args, FocusWatchdog.RestartedArg) >= 0;
 
             SetupExceptionHandling();
             AppLog.Info("Запуск FocusTracker");
@@ -285,7 +287,24 @@ namespace FocusTracker.App
             // Асистент живе в хмарі; тут лише показуємо його повідомлення в кутку
             var cloud = Services.GetRequiredService<CloudAssistant>();
             cloud.NoteAdded += note => Dispatcher.Invoke(() => JarvisPopup.Show(note));
+            Services.GetRequiredService<FocusWatchdog>();
             cloud.Start(() => (_userActivity!.LastInputTime, _windowTracker.CurrentApp), _flushCts!.Token);
+
+            // Сторож перезапустив застосунок, який закрили посеред фокус-режиму: повідомляємо Коуча
+            if (_restartedInFocus)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await cloud.ReportEventAsync("FocusTracker на ПК примусово закрили під час фокус-режиму; його автоматично перезапущено.");
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLog.Error("Не вдалося повідомити Коуча про закриття під час фокус-режиму", ex);
+                    }
+                });
+            }
         }
 
         private void StartUpdateChecks(MainWindow mainWindow)
@@ -389,6 +408,7 @@ namespace FocusTracker.App
             services.AddSingleton<ComputerTimeService>();
             services.AddSingleton<RecentActivityLog>();
             services.AddSingleton<FocusMode>();
+            services.AddSingleton<FocusWatchdog>();
             services.AddSingleton<CloudAssistant>();
             services.AddSingleton<CloudSyncRunner>();
             services.AddSingleton<IRestrictionEvaluator, RestrictionEvaluator>();
@@ -432,6 +452,14 @@ namespace FocusTracker.App
 
             _notifyIcon.ContextMenuStrip.Items.Add("Вийти", null, (s, e) =>
             {
+                var focus = Services.GetRequiredService<FocusMode>();
+                if (focus.IsActive)
+                {
+                    MessageBox.Show(
+                        $"Під час фокус-режиму вийти не можна (до {focus.Until:HH:mm}). Попросіть {AssistantInfo.Name} зняти його.",
+                        "FocusTracker", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
                 _exitRequested = true;
                 Current.MainWindow.Close();
             });
@@ -454,6 +482,8 @@ namespace FocusTracker.App
         {
             try
             {
+                // Звичайне завершення (оновлення, вихід, вимкнення Windows) — сторож не має перезапускати
+                Services?.GetService<FocusWatchdog>()?.Stop();
                 _windowTracker?.Stop();
                 _flushCts?.Cancel();
                 _userActivity?.Stop();

@@ -1,4 +1,4 @@
-using FocusTracker.App.Helpers;
+﻿using FocusTracker.App.Helpers;
 using FocusTracker.App.Services;
 using FocusTracker.Data;
 using FocusTracker.Data.Cloud;
@@ -205,22 +205,25 @@ namespace FocusTracker.App.Jarvis
             }
         }
 
-        // «Завершити фокус-режим»: тут і в хмарі, тобто на всіх пристроях
-        public async Task StopFocusAsync()
+        public static readonly TimeSpan EmergencyDelay = TimeSpan.FromMinutes(10);
+
+        // Екстрене зняття фокус-режиму: він закінчиться через EmergencyDelay на всіх пристроях, а Коуч одразу про це дізнається
+        public async Task<DateTime?> EmergencyStopAsync()
         {
-            await _gate.WaitAsync();
-            try
-            {
-                _focus.Stop();
-                _focusFromCloud = false;
-                _appliedFocusUpdatedAt = null;
-                if (Store() is { } store)
-                    await store.ClearFocusAsync();
-            }
-            finally
-            {
-                _gate.Release();
-            }
+            var store = RequireStore();
+            var until = await store.ShortenFocusAsync(EmergencyDelay);
+            if (until != null)
+                await store.InsertEventAsync(_settings.Current.DeviceId,
+                    $"Користувач натиснув екстрене зняття фокус-режиму на ПК: він закінчиться о {until.Value.ToLocalTime():HH:mm}.");
+            await PollNowAsync();
+            return until;
+        }
+
+        // Сигнал Коучу від застосунку (обхід фокус-режиму)
+        public async Task ReportEventAsync(string text)
+        {
+            if (!IsActive) return;
+            await RequireStore().InsertEventAsync(_settings.Current.DeviceId, text);
         }
 
         // Отримати нові повідомлення зараз, не чекаючи таймера

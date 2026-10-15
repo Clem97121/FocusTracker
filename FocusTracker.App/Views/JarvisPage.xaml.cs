@@ -1,4 +1,4 @@
-using FocusTracker.App.Jarvis;
+﻿using FocusTracker.App.Jarvis;
 using FocusTracker.Data.Cloud;
 using FocusTracker.Domain;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,7 +58,7 @@ namespace FocusTracker.App.Views
             var at = message.CreatedAtUtc.ToLocalTime();
             var time = at.Date == DateTime.Today ? at.ToString("HH:mm") : at.ToString("dd.MM HH:mm");
             if (message.Role == "user")
-                return new ChatItem($"Ви · {time}", message.Text, true);
+                return new ChatItem(message.Kind == "event" ? $"Подія · {time}" : $"Ви · {time}", message.Text, true);
 
             var header = message.Kind switch
             {
@@ -123,7 +123,9 @@ namespace FocusTracker.App.Views
                 parts.Add($"Фокус-режим до {_focus.Until:HH:mm}: заблоковано {string.Join(", ", _focus.BlockedApps)}.");
 
             StatusText.Text = string.Join(" ", parts);
-            StopFocusButton.Visibility = _focus.IsActive ? Visibility.Visible : Visibility.Collapsed;
+            var focusVisibility = _focus.IsActive && _cloud.IsActive ? Visibility.Visible : Visibility.Collapsed;
+            AskStopFocusButton.Visibility = focusVisibility;
+            EmergencyStopButton.Visibility = focusVisibility;
             CheckNowButton.IsEnabled = _cloud.IsActive && !_sending;
             SendButton.IsEnabled = _cloud.IsActive && !_sending;
             MemoryButton.IsEnabled = _cloud.IsActive;
@@ -138,19 +140,34 @@ namespace FocusTracker.App.Views
                 host.Content = new CoachMemoryPage();
         }
 
-        private async void StopFocus_Click(object sender, RoutedEventArgs e)
+        // Фокус-режим знімає лише Коуч: пишемо йому причину
+        private void AskStopFocus_Click(object sender, RoutedEventArgs e)
         {
-            // Фокус-режим спільний для всіх пристроїв: знімаємо його і в хмарі
-            StopFocusButton.IsEnabled = false;
+            InputBox.Text = "Прошу зняти фокус-режим, бо ";
+            InputBox.Focus();
+            InputBox.CaretIndex = InputBox.Text.Length;
+        }
+
+        private async void EmergencyStop_Click(object sender, RoutedEventArgs e)
+        {
+            var answer = MessageBox.Show(
+                $"Фокус-режим закінчиться через {CloudAssistant.EmergencyDelay.TotalMinutes:0} хвилин на всіх пристроях, і {AssistantInfo.Name} одразу про це дізнається. Продовжити?",
+                "Екстрене зняття фокус-режиму", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (answer != MessageBoxResult.Yes) return;
+
+            EmergencyStopButton.IsEnabled = false;
             try
             {
-                await _cloud.StopFocusAsync();
+                var until = await _cloud.EmergencyStopAsync();
+                StatusText.Text = until is { } u
+                    ? $"Фокус-режим закінчиться о {u.ToLocalTime():HH:mm}."
+                    : "Фокус-режим уже не активний.";
             }
             catch (Exception ex)
             {
-                StatusText.Text = $"Фокус-режим тут вимкнено, але не в хмарі: {ex.Message}";
+                StatusText.Text = $"Не вдалося: {ex.Message}";
             }
-            StopFocusButton.IsEnabled = true;
+            EmergencyStopButton.IsEnabled = true;
         }
 
         private void InputBox_KeyDown(object sender, KeyEventArgs e)

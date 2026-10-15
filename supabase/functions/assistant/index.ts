@@ -203,14 +203,16 @@ async function chatRequest(): Promise<string> {
 
 async function answerPendingChat() {
   const pending = await sql`
-    select id from public.ft_assistant_messages where status = 'pending' order by id`;
+    select id, kind from public.ft_assistant_messages where status = 'pending' order by id`;
   if (pending.length === 0) return;
   const ids = pending.map((p) => p.id as string);
+  // Сигнал застосунку (обхід фокус-режиму): відповідь — помітне повідомлення на всіх пристроях
+  const event = pending.some((p) => p.kind === "event");
 
   try {
     const settings = await loadSettings();
     if (!settings?.enabled) throw new Error("Асистент у хмарі вимкнений у налаштуваннях застосунку.");
-    await run("chat", settings, await activeDevice());
+    await run("chat", settings, await activeDevice(), event);
     await sql`update public.ft_assistant_messages set status = 'done', error = null where id in ${sql(ids)}`;
   } catch (e) {
     await logError(e);
@@ -252,6 +254,14 @@ function systemPrompt(name: string): string {
   домовленості) зберігай через remember у відповідний розділ профілю; якщо щось застаріло або
   він просить забути — виправ через rewrite_profile_section. Дрібниці дня в профіль не пиши.
   Про минулі дні, яких немає в контексті, шукай через search_journal.
+- Фокус-режим, який ти ввімкнув, користувач сам вимкнути не може. Він може попросити тебе в чаті —
+  знімай (end_focus), лише якщо причина справді важлива (термінова робота, здоров'я, сім'я);
+  «хочу пограти», «лише одну катку», «втомився» — не причина: відмов коротко й дружньо, запропонуй перерву
+  без заблокованих програм. Є ще екстрене зняття через 10 хвилин — про нього ти дізнаєшся.
+- Повідомлення [event] — сигнали застосунку, а не слова користувача: екстрене зняття фокус-режиму,
+  закриття FocusTracker чи вимкнення блокування на телефоні під час фокусу. Реагуй одразу, коротко й прямо:
+  назви, що сталося, спитай чому і що далі. Без моралізаторства; за потреби — новий фокус-режим.
+  Такі випадки варто згадати в підсумку дня.
 - Пиши тією мовою, якою користувач написав свої цілі.`;
 }
 
@@ -339,12 +349,23 @@ function tools(kind: Kind, s: Settings): BetaTool[] {
   return list;
 }
 
+const endFocusTool: BetaTool = {
+  name: "end_focus",
+  description: "Зняти фокус-режим на всіх пристроях — лише коли користувач попросив і причина справді важлива.",
+  input_schema: {
+    type: "object",
+    properties: { reason: { type: "string", description: "Чому знімаєш, одним реченням" } },
+    required: ["reason"],
+    additionalProperties: false,
+  },
+};
+
 // Opus, Sonnet і Fable підтримують резервну модель на сервері при відмові класифікатора безпеки
 function supportsFallbacks(model: string): boolean {
   return model.startsWith("claude-opus") || model.startsWith("claude-sonnet") || model.startsWith("claude-fable");
 }
 
-async function run(kind: Kind, s: Settings, active: Presence | null) {
+async function run(kind: Kind, s: Settings, active: Presence | null, event = false) {
   await ensureMemorySchema(sql);
   const today = zoned(new Date(), s.timeZone).date;
   const memory = await describeMemory(sql, today);
@@ -369,6 +390,7 @@ async function run(kind: Kind, s: Settings, active: Presence | null) {
 
   const target = kind === "check" ? active?.device_id ?? null : null;
   const toolList = tools(kind, s);
+  if (kind === "chat") toolList.push(endFocusTool);
   const texts: string[] = [];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -404,9 +426,12 @@ async function run(kind: Kind, s: Settings, active: Presence | null) {
 
   if (kind === "chat") {
     const reply = texts.at(-1) ?? "Готово.";
-    await sql`
+    const replyKind = event ? "nudge" : "chat";
+    const [sent] = await sql`
       insert into public.ft_assistant_messages (role, kind, text, status)
-      values ('assistant', 'chat', ${reply}, 'done')`;
+      values ('assistant', ${replyKind}, ${reply}, 'done')
+      returning id`;
+    if (event) await pushMessage(sql, { id: Number(sent.id), kind: replyKind, text: reply, target: null });
   }
   // У перевірках і плані текст поза інструментами — міркування моделі, користувачу його не показуємо
   await sql`update public.ft_assistant_state set last_error = null where id = 1`;
@@ -463,6 +488,12 @@ async function executeTool(
     }
     case "add_task":
       return await addTask(input);
+    case "end_focus": {
+      const [focus] = await sql`
+        update public.ft_focus set until = null, apps = '{}', updated_at = now()
+        where id = 1 and until > now() returning id`;
+      return focus ? "Фокус-режим знято." : "Фокус-режим і так не активний.";
+    }
     case "start_focus": {
       if (!s.mayStartFocus) throw new Error("Користувач не дозволив вмикати фокус-режим — лише пропонуй.");
       const minutes = Math.min(Math.max(Math.round(Number(input.minutes) || 0), 1), MAX_FOCUS_MINUTES);

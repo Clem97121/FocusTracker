@@ -1,4 +1,4 @@
-using FocusTracker.Mobile.Platforms.Android;
+﻿using FocusTracker.Mobile.Platforms.Android;
 
 namespace FocusTracker.Mobile.Services;
 
@@ -90,6 +90,7 @@ public class PhoneSync
             }
 
             await FocusState.RefreshAsync(_account);
+            await ReportDisabledBlockerAsync(api, token, device, context);
             await UploadIconsAsync(api, token, snapshot, context);
             await PushService.UploadTokenAsync(api, token, device);
 
@@ -137,5 +138,23 @@ public class PhoneSync
             .ToList();
         if (icons.Count > 0)
             await api.UpsertAsync("ft_program_icons", "identifier", icons, token, ignoreDuplicates: true);
+    }
+
+    // Службу блокування вимкнули посеред фокус-режиму — Коуч дізнається одразу (раз на кожен фокус)
+    private static async Task ReportDisabledBlockerAsync(SupabaseApi api, string token, Guid device, global::Android.Content.Context context)
+    {
+        if (!FocusState.IsActive || FocusBlockerService.IsEnabled(context)) return;
+        var key = FocusState.UntilUtc!.Value.Ticks;
+        if (Preferences.Get("focus.blocker_off_reported", 0L) == key) return;
+
+        await api.InsertAsync("ft_assistant_messages", new
+        {
+            role = "user",
+            kind = "event",
+            text = "На телефоні вимкнено службу блокування FocusTracker під час фокус-режиму: заблоковані програми там знову відкриваються.",
+            device_id = device,
+            status = "pending",
+        }, token);
+        Preferences.Set("focus.blocker_off_reported", key);
     }
 }

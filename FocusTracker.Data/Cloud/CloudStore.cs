@@ -1,4 +1,4 @@
-using Npgsql;
+﻿using Npgsql;
 using NpgsqlTypes;
 
 namespace FocusTracker.Data.Cloud
@@ -109,13 +109,17 @@ namespace FocusTracker.Data.Cloud
                 id bigserial primary key,
                 created_at timestamptz not null default now(),
                 role text not null check (role in ('user', 'assistant')),
-                kind text not null default 'chat' check (kind in ('chat', 'nudge', 'ask', 'plan', 'focus', 'review')),
+                kind text not null default 'chat',
                 text text not null,
                 device_id uuid,
                 target_device_id uuid,
                 status text not null default 'done' check (status in ('pending', 'done', 'error')),
                 error text
             );
+            -- event — сигнал застосунку асистенту (обхід фокус-режиму)
+            alter table public.ft_assistant_messages drop constraint if exists ft_assistant_messages_kind_check;
+            alter table public.ft_assistant_messages add constraint ft_assistant_messages_kind_check
+                check (kind in ('chat', 'nudge', 'ask', 'plan', 'focus', 'review', 'event'));
             create index if not exists ft_assistant_messages_pending on public.ft_assistant_messages (id) where status = 'pending';
             alter table public.ft_assistant_messages enable row level security;
             create table if not exists public.ft_focus (
@@ -194,7 +198,7 @@ namespace FocusTracker.Data.Cloud
             """;
 
         // Змінюється, коли SchemaSql отримує нові таблиці: пристрої перевіряють схему заново
-        public const int SchemaVersion = 7;
+        public const int SchemaVersion = 8;
 
         private readonly string _connectionString;
 

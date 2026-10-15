@@ -1,4 +1,4 @@
-using Npgsql;
+﻿using Npgsql;
 using NpgsqlTypes;
 
 namespace FocusTracker.Data.Cloud
@@ -94,6 +94,19 @@ namespace FocusTracker.Data.Cloud
             return (long)(await command.ExecuteScalarAsync(token))!;
         }
 
+        // Сигнал асистенту від застосунку (напр. екстрене зняття фокус-режиму); він реагує одразу, як на повідомлення
+        public async Task InsertEventAsync(Guid deviceId, string text, CancellationToken token = default)
+        {
+            await using var connection = await OpenAsync(token);
+            await using var command = new NpgsqlCommand("""
+                insert into public.ft_assistant_messages (role, kind, text, device_id, status)
+                values ('user', 'event', @text, @device, 'pending');
+                """, connection);
+            command.Parameters.AddWithValue("text", text);
+            command.Parameters.AddWithValue("device", deviceId);
+            await command.ExecuteNonQueryAsync(token);
+        }
+
         public async Task<CloudAssistantMessage?> GetMessageAsync(long id, CancellationToken token = default) =>
             (await QueryMessagesAsync("where id = @id", command => command.Parameters.AddWithValue("id", id), token))
                 .FirstOrDefault();
@@ -163,12 +176,17 @@ namespace FocusTracker.Data.Cloud
                 reader.GetDateTime(3));
         }
 
-        public async Task ClearFocusAsync(CancellationToken token = default)
+        // Екстрене зняття: фокус-режим закінчиться не пізніше ніж через delay. Повертає новий кінець або null, якщо фокусу немає.
+        public async Task<DateTime?> ShortenFocusAsync(TimeSpan delay, CancellationToken token = default)
         {
             await using var connection = await OpenAsync(token);
-            await using var command = new NpgsqlCommand(
-                "update public.ft_focus set until = null, apps = '{}', updated_at = now() where id = 1;", connection);
-            await command.ExecuteNonQueryAsync(token);
+            await using var command = new NpgsqlCommand("""
+                update public.ft_focus set until = least(until, now() + @delay), updated_at = now()
+                where id = 1 and until > now()
+                returning until;
+                """, connection);
+            command.Parameters.AddWithValue("delay", delay);
+            return await command.ExecuteScalarAsync(token) as DateTime?;
         }
 
         public async Task<CloudAssistantState?> GetAssistantStateAsync(CancellationToken token = default)
