@@ -40,6 +40,9 @@ export async function ensureMemorySchema(sql: Sql) {
     alter table public.ft_coach_profile enable row level security;
     alter table public.ft_coach_journal enable row level security;
     alter table public.ft_assistant_state add column if not exists consolidated_date date;
+    alter table public.ft_assistant_state add column if not exists rules_effective jsonb;
+    alter table public.ft_assistant_state add column if not exists rules_pending jsonb;
+    alter table public.ft_assistant_state add column if not exists rules_pending_since date;
     alter table public.ft_assistant_messages drop constraint if exists ft_assistant_messages_kind_check;
     alter table public.ft_assistant_messages add constraint ft_assistant_messages_kind_check
       check (kind in ('chat', 'nudge', 'ask', 'plan', 'focus', 'review', 'event'));

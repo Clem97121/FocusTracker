@@ -46,6 +46,8 @@ interface Settings {
   enabled: boolean;
   timeZone: string;
   name: string;
+  // Нові цілі й правила, які набудуть сили завтра (див. effectiveRules)
+  pending?: { goals: string; rules: string };
 }
 
 interface Presence {
@@ -254,6 +256,12 @@ function systemPrompt(name: string): string {
   домовленості) зберігай через remember у відповідний розділ профілю; якщо щось застаріло або
   він просить забути — виправ через rewrite_profile_section. Дрібниці дня в профіль не пиши.
   Про минулі дні, яких немає в контексті, шукай через search_journal.
+- Домовленості з іншими людьми (гра з друзями, які на нього чекають, зустріч, сім'я) поважай: не зривай їх
+  фокус-режимом і не змушуй підводити людей. Якщо через таку домовленість правило не виконано — прийми це,
+  але домовся про чесну компенсацію (напр. +1 година продуктивного часу завтра чи 30 хвилин зараз перед грою)
+  і збережи її через remember у agreements; наступного дня перевір. Якщо такі «домовленості» стають
+  щоденними — скажи про це прямо. Краще попереджати заздалегідь: удень нагадай, скільки ще треба,
+  щоб вечір був вільним.
 - Фокус-режим, який ти ввімкнув, користувач сам вимкнути не може. Він може попросити тебе в чаті —
   знімай (end_focus), лише якщо причина справді важлива (термінова робота, здоров'я, сім'я);
   «хочу пограти», «лише одну катку», «втомився» — не причина: відмов коротко й дружньо, запропонуй перерву
@@ -271,6 +279,12 @@ ${s.goals?.trim() || "(не задані)"}
 
 ## Правила користувача для тебе
 ${s.rules?.trim() || "(немає)"}
+${s.pending ? `
+Сьогодні користувач змінив цілі чи правила; нова версія діє лише з завтра (так задумано, щоб правила
+не послаблювали в момент, коли вони спрацювали). Сьогодні керуйся чинними, але знай про нові:
+Нові цілі: ${s.pending.goals || "(порожньо)"}
+Нові правила: ${s.pending.rules || "(порожньо)"}
+Якщо він посилається на нове правило — поясни, що воно почне діяти завтра.` : ""}
 
 ## Розклад
 Продуктивні години: ${pad(s.fromHour)}:00–${pad(s.toHour)}:00 (${s.timeZone}). Поза ними — особистий час.
@@ -374,6 +388,7 @@ function supportsFallbacks(model: string): boolean {
 async function run(kind: Kind, s: Settings, active: Presence | null, event = false) {
   await ensureMemorySchema(sql);
   const today = zoned(new Date(), s.timeZone).date;
+  s = await effectiveRules(s, today);
   const memory = await describeMemory(sql, today);
   const context = await describeNow(s, active);
 
@@ -580,6 +595,42 @@ async function addTask(input: Record<string, unknown>): Promise<string> {
 }
 
 // ===================== Контекст =====================
+
+// Цілі й правила, змінені сьогодні, діють лише з завтрашнього дня: інакше будь-яке обмеження
+// можна обійти, послабивши правило в налаштуваннях саме тоді, коли воно спрацювало.
+async function effectiveRules(s: Settings, today: string): Promise<Settings> {
+  const current = { goals: s.goals.trim(), rules: s.rules.trim() };
+  const [state] = await sql`
+    select rules_effective, rules_pending, rules_pending_since::text as since
+    from public.ft_assistant_state where id = 1`;
+  const same = (a: unknown, b: typeof current) =>
+    !!a && (a as typeof current).goals === b.goals && (a as typeof current).rules === b.rules;
+
+  let effective = state?.rules_effective as typeof current | null;
+  let pending = state?.rules_pending as typeof current | null;
+  let since = state?.since as string | null;
+  if (!effective || same(effective, current)) {
+    effective = current;
+    pending = null;
+    since = null;
+  } else {
+    if (!same(pending, current)) {
+      pending = current;
+      since = today;
+    }
+    if (since && since < today) {
+      effective = current;
+      pending = null;
+      since = null;
+    }
+  }
+  await sql`
+    update public.ft_assistant_state
+    set rules_effective = ${sql.json(effective)}, rules_pending = ${pending ? sql.json(pending) : null},
+        rules_pending_since = ${since}::date
+    where id = 1`;
+  return { ...s, goals: effective.goals, rules: effective.rules, pending: pending ?? undefined };
+}
 
 async function loadSettings(): Promise<Settings | null> {
   const [row] = await sql`select data from public.ft_assistant_settings where id = 1`;
