@@ -421,6 +421,8 @@ async function run(kind: Kind, s: Settings, active: Presence | null, event = fal
         results.push({ type: "tool_result", tool_use_id: block.id, content: errorText(e), is_error: true });
       }
     }
+    // stop_reason = tool_use без жодного виклику інструмента: порожня відповідь зламала б наступний запит
+    if (results.length === 0) break;
     messages.push({ role: "user", content: results });
   }
 
