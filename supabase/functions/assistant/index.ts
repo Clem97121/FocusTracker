@@ -318,8 +318,14 @@ function tools(kind: Kind, s: Settings): BetaTool[] {
         skill_name: { type: "string", description: "Назва наявної навички, до якої належить задача" },
         estimated_minutes: { type: "integer", description: "Оцінка тривалості в хвилинах" },
         difficulty: { type: "integer", description: "Складність 1–10 (необов'язково, за замовчуванням 3)" },
+        programs: {
+          type: "array",
+          items: { type: "string" },
+          description: "Програми ПК, у яких виконується задача: ідентифікатори процесів (code, WindowsTerminal) або назви сайтів " +
+            "(Djinni, LinkedIn, GitHub), як у статистиці. Досвід за задачу нараховується лише за час у цих програмах — без них буде 0 XP.",
+        },
       },
-      required: ["title", "skill_name", "estimated_minutes"],
+      required: ["title", "skill_name", "estimated_minutes", "programs"],
       additionalProperties: false,
     },
   });
@@ -545,6 +551,13 @@ async function addTask(input: Record<string, unknown>): Promise<string> {
     throw new Error(`Навички «${skillName}» немає. Наявні: ${skills.map((k) => k.name).join(", ")}`);
   }
 
+  const programs = [...new Set((Array.isArray(input.programs) ? input.programs : [])
+    .map((p) => String(p).trim())
+    .filter((p) => p && p.toLowerCase() !== FOCUS_TRACKER_APP))];
+  if (programs.length === 0) {
+    throw new Error("Вкажи програми чи сайти, у яких виконується задача: без них за неї буде 0 XP.");
+  }
+
   const settings = await loadSettings();
   const doc = {
     title,
@@ -558,12 +571,12 @@ async function addTask(input: Record<string, unknown>): Promise<string> {
     earnedXp: null,
     activeSeconds: null,
     isPassive: false,
-    programs: [] as string[],
+    programs,
   };
   await sql`
     insert into public.ft_entities (kind, sync_id, data, deleted, updated_at, updated_by, synced_at)
     values ('task', gen_random_uuid(), ${sql.json(doc)}, false, now(), ${CLOUD_ASSISTANT_ID}, now())`;
-  return `Задачу «${title}» додано до навички «${skill.name}».`;
+  return `Задачу «${title}» додано до навички «${skill.name}» (програми: ${programs.join(", ")}).`;
 }
 
 // ===================== Контекст =====================
