@@ -36,4 +36,4 @@ jobs:
 
       - name: Deploy function
         if: steps.secrets.outputs.ready == 'true'
-        run: supabase functions deploy assistant --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+        run: supabase functions deploy assistant --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt --yes
