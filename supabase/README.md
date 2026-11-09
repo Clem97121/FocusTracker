@@ -13,7 +13,7 @@
 
    Після цього workflow `deploy-assistant` розгортає функцію при кожній зміні `supabase/functions/**`
    у `main`. Щоб розгорнути вперше, запустіть його вручну: **Actions → deploy-assistant → Run workflow**.
-2. **Supabase → Edge Functions → Secrets** — додайте `ANTHROPIC_API_KEY` (ключ з console.anthropic.com).
+2. **Supabase → Edge Functions → Secrets** — додайте ключ обраної моделі: `GEMINI_API_KEY` (aistudio.google.com/apikey) для Gemini або `ANTHROPIC_API_KEY` (console.anthropic.com) для Claude.
    `SUPABASE_DB_URL` Supabase задає сам.
 3. У застосунку: **Налаштування** → налаштуйте синхронізацію з Supabase, у розділі асистента увімкніть
    його й натисніть «Зберегти». Решту застосунок робить сам при першому обміні з хмарою й після

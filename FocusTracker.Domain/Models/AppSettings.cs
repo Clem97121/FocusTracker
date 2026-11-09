@@ -21,7 +21,7 @@ public class AppSettings
     public string? CloudConnectionProtected { get; set; }
 
     // === Джарвіс: асистент продуктивності на базі Claude
-    public const string DefaultJarvisModel = "claude-opus-5-5";
+    public const string DefaultJarvisModel = "gemini-3.5-flash-lite";
     public const int DefaultJarvisCheckMinutes = 20;
 
     public bool JarvisEnabled { get; set; }
