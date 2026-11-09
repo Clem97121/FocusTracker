@@ -5,7 +5,8 @@
 //   {"reason":"chat"} — тригер на нове повідомлення користувача в ft_assistant_messages.
 // Виклик без правильного заголовка x-ft-secret (ft_assistant_state.cron_secret) відхиляється.
 //
-// Секрети функції: ANTHROPIC_API_KEY (задає користувач), SUPABASE_DB_URL (дає Supabase),
+// Секрети функції: GEMINI_API_KEY або ANTHROPIC_API_KEY (задає користувач, залежно від обраної моделі),
+// SUPABASE_DB_URL (дає Supabase),
 // FIREBASE_SERVICE_ACCOUNT (необов'язковий: push на телефони, див. push.ts).
 
 import Anthropic from "npm:@anthropic-ai/sdk@0.128.0";
@@ -18,6 +19,7 @@ import type {
   MessageCreateParamsNonStreaming,
 } from "npm:@anthropic-ai/sdk@0.128.0/resources/beta/messages/messages";
 import postgres from "npm:postgres@3.4.9";
+import { createGemini, isGemini } from "./gemini.ts";
 import { pushMessage } from "./push.ts";
 import { describeRestrictions, entityTools, executeEntityTool } from "./entities.ts";
 import { CONSOLIDATE_TASK, describeMemory, ensureMemorySchema, executeMemoryTool, journalTool, memoryTools } from "./memory.ts";
@@ -424,7 +426,7 @@ async function run(kind: Kind, s: Settings, active: Presence | null, event = fal
       output_config: { effort: kind === "check" ? "low" : "medium" },
     });
 
-    if (response.stop_reason === "refusal") throw new Error("Claude відмовився відповідати на цей запит.");
+    if (response.stop_reason === "refusal") throw new Error("Модель відмовилася відповідати на цей запит.");
 
     for (const block of response.content) {
       if (block.type === "text" && block.text.trim()) texts.push(block.text.trim());
@@ -461,6 +463,7 @@ async function run(kind: Kind, s: Settings, active: Presence | null, event = fal
 }
 
 async function create(params: MessageCreateParamsNonStreaming): Promise<BetaMessage> {
+  if (isGemini(params.model)) return await createGemini(params);
   if (supportsFallbacks(params.model)) {
     // "default": сервер сам обирає резервну модель за категорією відмови
     params = { ...params, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" };

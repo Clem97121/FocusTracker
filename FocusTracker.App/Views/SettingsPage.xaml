@@ -136,6 +136,8 @@
                       SelectedValuePath="Tag"
                       Style="{StaticResource CustomComboBox}"
                       Margin="0 0 0 10">
+                <ComboBoxItem Content="Gemini 3.5 Flash-Lite — безкоштовна" Tag="gemini-3.5-flash-lite"/>
+                <ComboBoxItem Content="Gemini 3.8 Flash — безкоштовна, розумніша" Tag="gemini-3.8-flash"/>
                 <ComboBoxItem Content="Claude Opus 5.5 — найрозумніша" Tag="claude-opus-5-5"/>
                 <ComboBoxItem Content="Claude Sonnet 5.5 — швидша й дешевша" Tag="claude-sonnet-5-5"/>
                 <ComboBoxItem Content="Claude Haiku 5.5 — найдешевша" Tag="claude-haiku-5-5"/>
